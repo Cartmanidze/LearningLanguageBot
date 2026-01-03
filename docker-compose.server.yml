@@ -1,0 +1,35 @@
+# Production configuration - pulls pre-built image from GHCR
+# Usage: docker compose -f docker-compose.server.yml up -d
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: learning-language-bot-db
+    environment:
+      POSTGRES_DB: learninglanguagebot
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d learninglanguagebot"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  bot:
+    image: ${DOCKER_IMAGE:-ghcr.io/cartmanidze/learninglanguagebot:latest}
+    container_name: learning-language-bot
+    environment:
+      ConnectionStrings__DefaultConnection: "Host=postgres;Database=learninglanguagebot;Username=postgres;Password=${POSTGRES_PASSWORD}"
+      Telegram__BotToken: ${TELEGRAM_BOT_TOKEN}
+      OpenRouter__ApiKey: ${OPENROUTER_API_KEY}
+      OpenRouter__Model: ${OPENROUTER_MODEL:-deepseek/deepseek-v3.2}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  postgres_data:

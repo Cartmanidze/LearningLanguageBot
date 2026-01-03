@@ -5,7 +5,7 @@ services:
     restart: unless-stopped
     environment:
       - Telegram__BotToken=${TELEGRAM_BOT_TOKEN}
-      - DeepSeek__ApiKey=${DEEPSEEK_API_KEY}
+      - OpenRouter__ApiKey=${OPENROUTER_API_KEY}
       - ConnectionStrings__DefaultConnection=Host=postgres;Database=learninglanguagebot;Username=postgres;Password=${POSTGRES_PASSWORD}
     depends_on:
       postgres:

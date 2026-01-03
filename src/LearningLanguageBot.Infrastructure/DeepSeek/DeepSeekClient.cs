@@ -29,6 +29,7 @@ public class DeepSeekClient
 
         _httpClient.BaseAddress = new Uri(_options.BaseUrl);
         _httpClient.DefaultRequestHeaders.Add("Authorization", $"Bearer {_options.ApiKey}");
+        _httpClient.DefaultRequestHeaders.Add("X-Title", _options.SiteName);
     }
 
     public async Task<string> ChatAsync(string systemPrompt, string userPrompt, CancellationToken ct = default)
@@ -55,7 +56,7 @@ public class DeepSeekClient
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "DeepSeek API call failed");
+            _logger.LogError(ex, "OpenRouter API call failed");
             throw;
         }
     }
