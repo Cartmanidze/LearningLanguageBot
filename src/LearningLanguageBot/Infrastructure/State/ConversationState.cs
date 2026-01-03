@@ -36,6 +36,7 @@ public class UserState
     public Guid? EditingCardId { get; set; }
     public EditAction? EditAction { get; set; }
     public ReviewSession? ActiveReview { get; set; }
+    public List<TimeOnly> SelectedReminderTimes { get; set; } = [];
     public DateTime LastActivity { get; set; } = DateTime.UtcNow;
 
     public void Touch() => LastActivity = DateTime.UtcNow;

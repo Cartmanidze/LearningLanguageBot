@@ -175,31 +175,9 @@ public class OnboardingHandler
         if (callback.Data == CallbackData.RemindersCustom)
         {
             state.OnboardingStep = OnboardingStep.CustomReminders;
+            state.SelectedReminderTimes = [];
 
-            await _bot.EditMessageText(
-                callback.Message!.Chat.Id,
-                callback.Message.MessageId,
-                "Введи время напоминаний через запятую:\n\n" +
-                "Например: 9:00, 14:00, 20:00\n\n" +
-                "Или выбери готовый вариант:",
-                replyMarkup: new InlineKeyboardMarkup(new[]
-                {
-                    new[]
-                    {
-                        InlineKeyboardButton.WithCallbackData("🌅 Утро (9:00)", "reminder:9"),
-                        InlineKeyboardButton.WithCallbackData("🌞 День (14:00)", "reminder:14")
-                    },
-                    new[]
-                    {
-                        InlineKeyboardButton.WithCallbackData("🌙 Вечер (20:00)", "reminder:20"),
-                        InlineKeyboardButton.WithCallbackData("📅 Все три", "reminder:all")
-                    },
-                    new[]
-                    {
-                        InlineKeyboardButton.WithCallbackData("⬅️ Назад", "reminder:back")
-                    }
-                }),
-                cancellationToken: ct);
+            await ShowCustomRemindersMenuAsync(callback.Message!.Chat.Id, callback.Message.MessageId, state, ct);
             return;
         }
 
@@ -214,6 +192,7 @@ public class OnboardingHandler
         if (data == "reminder:back")
         {
             state.OnboardingStep = OnboardingStep.ChooseReminders;
+            state.SelectedReminderTimes = [];
 
             var keyboard = new InlineKeyboardMarkup(new[]
             {
@@ -234,17 +213,81 @@ public class OnboardingHandler
             return;
         }
 
-        List<TimeOnly> times = data switch
+        if (data == "reminder:done")
         {
-            "reminder:9" => [new TimeOnly(9, 0)],
-            "reminder:14" => [new TimeOnly(14, 0)],
-            "reminder:20" => [new TimeOnly(20, 0)],
-            "reminder:all" => [new TimeOnly(9, 0), new TimeOnly(14, 0), new TimeOnly(20, 0)],
-            _ => [new TimeOnly(9, 0), new TimeOnly(14, 0), new TimeOnly(20, 0)]
+            if (state.SelectedReminderTimes.Count == 0)
+            {
+                await _bot.AnswerCallbackQuery(callback.Id, "Выбери хотя бы одно время!", showAlert: true, cancellationToken: ct);
+                return;
+            }
+
+            var times = state.SelectedReminderTimes.OrderBy(t => t).ToList();
+            await _userService.UpdateUserSettingsAsync(callback.From.Id, reminderTimes: times, ct: ct);
+            state.SelectedReminderTimes = [];
+            await FinishOnboardingAsync(callback.Message!.Chat.Id, callback.Message.MessageId, state, ct);
+            return;
+        }
+
+        if (data == "reminder:all")
+        {
+            state.SelectedReminderTimes = [new TimeOnly(9, 0), new TimeOnly(14, 0), new TimeOnly(20, 0)];
+            await ShowCustomRemindersMenuAsync(callback.Message!.Chat.Id, callback.Message.MessageId, state, ct);
+            return;
+        }
+
+        // Toggle time selection
+        TimeOnly? timeToToggle = data switch
+        {
+            "reminder:9" => new TimeOnly(9, 0),
+            "reminder:14" => new TimeOnly(14, 0),
+            "reminder:20" => new TimeOnly(20, 0),
+            _ => null
         };
 
-        await _userService.UpdateUserSettingsAsync(callback.From.Id, reminderTimes: times, ct: ct);
-        await FinishOnboardingAsync(callback.Message!.Chat.Id, callback.Message.MessageId, state, ct);
+        if (timeToToggle.HasValue)
+        {
+            if (state.SelectedReminderTimes.Contains(timeToToggle.Value))
+                state.SelectedReminderTimes.Remove(timeToToggle.Value);
+            else
+                state.SelectedReminderTimes.Add(timeToToggle.Value);
+
+            await ShowCustomRemindersMenuAsync(callback.Message!.Chat.Id, callback.Message.MessageId, state, ct);
+        }
+    }
+
+    private async Task ShowCustomRemindersMenuAsync(long chatId, int messageId, UserState state, CancellationToken ct)
+    {
+        var selected = state.SelectedReminderTimes;
+
+        string Check(TimeOnly time) => selected.Contains(time) ? "✓ " : "";
+
+        var selectedText = selected.Count > 0
+            ? $"\n\nВыбрано: {string.Join(", ", selected.OrderBy(t => t).Select(t => t.ToString("HH:mm")))}"
+            : "";
+
+        await _bot.EditMessageText(
+            chatId,
+            messageId,
+            "Выбери время напоминаний (можно несколько):" + selectedText + "\n\nИли напиши своё время, например: 8:30, 13:00",
+            replyMarkup: new InlineKeyboardMarkup(new[]
+            {
+                new[]
+                {
+                    InlineKeyboardButton.WithCallbackData($"{Check(new TimeOnly(9, 0))}🌅 Утро (9:00)", "reminder:9"),
+                    InlineKeyboardButton.WithCallbackData($"{Check(new TimeOnly(14, 0))}🌞 День (14:00)", "reminder:14")
+                },
+                new[]
+                {
+                    InlineKeyboardButton.WithCallbackData($"{Check(new TimeOnly(20, 0))}🌙 Вечер (20:00)", "reminder:20"),
+                    InlineKeyboardButton.WithCallbackData("📅 Все три", "reminder:all")
+                },
+                new[]
+                {
+                    InlineKeyboardButton.WithCallbackData("⬅️ Назад", "reminder:back"),
+                    InlineKeyboardButton.WithCallbackData("✅ Готово", "reminder:done")
+                }
+            }),
+            cancellationToken: ct);
     }
 
     public async Task HandleCustomRemindersTextAsync(Message message, UserState state, CancellationToken ct)
