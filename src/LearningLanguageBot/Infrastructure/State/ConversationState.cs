@@ -66,11 +66,14 @@ public enum EditAction
 
 public class ReviewSession
 {
+    public long UserId { get; set; }
     public List<Guid> CardIds { get; set; } = [];
     public int CurrentIndex { get; set; }
     public int KnewCount { get; set; }
     public int DidNotKnowCount { get; set; }
     public bool ShowingAnswer { get; set; }
+    public bool WaitingForTypedAnswer { get; set; }
+    public int? LastMessageId { get; set; }
 
     public Guid CurrentCardId => CardIds.ElementAtOrDefault(CurrentIndex);
     public bool IsComplete => CurrentIndex >= CardIds.Count;

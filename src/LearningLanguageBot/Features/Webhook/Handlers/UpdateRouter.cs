@@ -93,6 +93,14 @@ public class UpdateRouter
             return;
         }
 
+        // Handle typed answers during review (Typing mode)
+        if (state.Mode == ConversationMode.Reviewing &&
+            state.ActiveReview?.WaitingForTypedAnswer == true)
+        {
+            await _reviewHandler.HandleTypedAnswerAsync(message, state, ct);
+            return;
+        }
+
         // Default: create card from text
         if (!string.IsNullOrWhiteSpace(text))
         {

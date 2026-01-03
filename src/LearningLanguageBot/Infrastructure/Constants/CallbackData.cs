@@ -25,7 +25,9 @@ public static class CallbackData
     public const string ReviewReveal = "review:reveal:";
     public const string ReviewKnew = "review:knew:";
     public const string ReviewDidNotKnow = "review:didnotknow:";
-    public const string ReviewCount = "review:count:";  // For typing mode
+    public const string ReviewCountAsKnew = "review:countas:knew:";      // Typing mode: count partial as correct
+    public const string ReviewCountAsDidNotKnow = "review:countas:not:"; // Typing mode: count partial as wrong
+    public const string ReviewSkipCard = "review:skip:";                  // Skip current card
 
     // Learn
     public const string LearnStart = "learn:start";
