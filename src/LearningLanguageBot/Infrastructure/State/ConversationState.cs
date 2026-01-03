@@ -55,6 +55,7 @@ public enum OnboardingStep
     ChooseMode,
     ChooseGoal,
     ChooseReminders,
+    CustomReminders,
     Completed
 }
 

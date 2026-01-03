@@ -69,6 +69,9 @@ public class OnboardingHandler
             case OnboardingStep.ChooseReminders:
                 await HandleRemindersChoiceAsync(callback, state, ct);
                 break;
+            case OnboardingStep.CustomReminders:
+                await HandleCustomRemindersCallbackAsync(callback, state, ct);
+                break;
         }
 
         await _bot.AnswerCallbackQuery(callback.Id, cancellationToken: ct);
@@ -169,17 +172,146 @@ public class OnboardingHandler
 
     private async Task HandleRemindersChoiceAsync(CallbackQuery callback, UserState state, CancellationToken ct)
     {
+        if (callback.Data == CallbackData.RemindersCustom)
+        {
+            state.OnboardingStep = OnboardingStep.CustomReminders;
+
+            await _bot.EditMessageText(
+                callback.Message!.Chat.Id,
+                callback.Message.MessageId,
+                "Введи время напоминаний через запятую:\n\n" +
+                "Например: 9:00, 14:00, 20:00\n\n" +
+                "Или выбери готовый вариант:",
+                replyMarkup: new InlineKeyboardMarkup(new[]
+                {
+                    new[]
+                    {
+                        InlineKeyboardButton.WithCallbackData("🌅 Утро (9:00)", "reminder:9"),
+                        InlineKeyboardButton.WithCallbackData("🌞 День (14:00)", "reminder:14")
+                    },
+                    new[]
+                    {
+                        InlineKeyboardButton.WithCallbackData("🌙 Вечер (20:00)", "reminder:20"),
+                        InlineKeyboardButton.WithCallbackData("📅 Все три", "reminder:all")
+                    },
+                    new[]
+                    {
+                        InlineKeyboardButton.WithCallbackData("⬅️ Назад", "reminder:back")
+                    }
+                }),
+                cancellationToken: ct);
+            return;
+        }
+
+        // Default times accepted
+        await FinishOnboardingAsync(callback.Message!.Chat.Id, callback.Message.MessageId, state, ct);
+    }
+
+    public async Task HandleCustomRemindersCallbackAsync(CallbackQuery callback, UserState state, CancellationToken ct)
+    {
+        var data = callback.Data ?? string.Empty;
+
+        if (data == "reminder:back")
+        {
+            state.OnboardingStep = OnboardingStep.ChooseReminders;
+
+            var keyboard = new InlineKeyboardMarkup(new[]
+            {
+                new[]
+                {
+                    InlineKeyboardButton.WithCallbackData("✓ Ок", CallbackData.RemindersOk),
+                    InlineKeyboardButton.WithCallbackData("⚙ Настроить", CallbackData.RemindersCustom)
+                }
+            });
+
+            await _bot.EditMessageText(
+                callback.Message!.Chat.Id,
+                callback.Message.MessageId,
+                "Когда присылать карточки?\n" +
+                "По умолчанию: 9:00, 14:00, 20:00",
+                replyMarkup: keyboard,
+                cancellationToken: ct);
+            return;
+        }
+
+        List<TimeOnly> times = data switch
+        {
+            "reminder:9" => [new TimeOnly(9, 0)],
+            "reminder:14" => [new TimeOnly(14, 0)],
+            "reminder:20" => [new TimeOnly(20, 0)],
+            "reminder:all" => [new TimeOnly(9, 0), new TimeOnly(14, 0), new TimeOnly(20, 0)],
+            _ => [new TimeOnly(9, 0), new TimeOnly(14, 0), new TimeOnly(20, 0)]
+        };
+
+        await _userService.UpdateUserSettingsAsync(callback.From.Id, reminderTimes: times, ct: ct);
+        await FinishOnboardingAsync(callback.Message!.Chat.Id, callback.Message.MessageId, state, ct);
+    }
+
+    public async Task HandleCustomRemindersTextAsync(Message message, UserState state, CancellationToken ct)
+    {
+        var text = message.Text ?? string.Empty;
+        var times = ParseReminderTimes(text);
+
+        if (times.Count == 0)
+        {
+            await _bot.SendMessage(
+                message.Chat.Id,
+                "❌ Не удалось распознать время.\n\n" +
+                "Введи в формате: 9:00, 14:00, 20:00",
+                cancellationToken: ct);
+            return;
+        }
+
+        await _userService.UpdateUserSettingsAsync(message.From!.Id, reminderTimes: times, ct: ct);
+
+        var timesStr = string.Join(", ", times.Select(t => t.ToString("HH:mm")));
+        await _bot.SendMessage(
+            message.Chat.Id,
+            $"✓ Установлены напоминания: {timesStr}",
+            cancellationToken: ct);
+
+        await FinishOnboardingAsync(message.Chat.Id, null, state, ct);
+    }
+
+    private List<TimeOnly> ParseReminderTimes(string input)
+    {
+        var times = new List<TimeOnly>();
+        var parts = input.Split(new[] { ',', ' ', ';' }, StringSplitOptions.RemoveEmptyEntries);
+
+        foreach (var part in parts)
+        {
+            var trimmed = part.Trim();
+            if (TimeOnly.TryParse(trimmed, out var time))
+            {
+                times.Add(time);
+            }
+            else if (int.TryParse(trimmed, out var hour) && hour >= 0 && hour <= 23)
+            {
+                times.Add(new TimeOnly(hour, 0));
+            }
+        }
+
+        return times.Distinct().OrderBy(t => t).ToList();
+    }
+
+    private async Task FinishOnboardingAsync(long chatId, int? messageId, UserState state, CancellationToken ct)
+    {
         state.Mode = ConversationMode.Normal;
         state.OnboardingStep = OnboardingStep.Completed;
 
-        await _bot.EditMessageText(
-            callback.Message!.Chat.Id,
-            callback.Message.MessageId,
-            "Готово! 🎉\n\n" +
-            "Теперь просто отправь мне слово или фразу — \n" +
-            "я создам карточку с переводом и примерами.\n\n" +
-            "Или отправь текст/файл — извлеку новые слова.\n\n" +
-            "Попробуй прямо сейчас 👇",
-            cancellationToken: ct);
+        var text = "Готово! 🎉\n\n" +
+                   "Теперь просто отправь мне слово или фразу — \n" +
+                   "я создам карточку с переводом и примерами.\n\n" +
+                   "Или отправь текст/файл — извлеку новые слова.\n\n" +
+                   "Попробуй прямо сейчас 👇";
+
+        if (messageId.HasValue)
+        {
+            await _bot.EditMessageText(chatId, messageId.Value, text, replyMarkup: null, cancellationToken: ct);
+        }
+        else
+        {
+            await _bot.SendMessage(chatId, text, cancellationToken: ct);
+        }
     }
 }

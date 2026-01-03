@@ -20,6 +20,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   - Three match results: Exact (auto-accept), Partial (user chooses), Wrong (auto-reject)
   - Skip button to skip difficult cards
 - `AnswerMatcher` service for comparing user answers with correct translations
+- Custom reminder time selection during onboarding
+  - Quick buttons: Morning (9:00), Day (14:00), Evening (20:00), All three
+  - Text input: parse times like "9:00, 14:00, 20:00" or just "9 14 20"
 
 ### Fixed
 - Fixed review mode not being respected - now ReviewHandler checks user's ReviewMode setting

@@ -83,7 +83,13 @@ public class UpdateRouter
 
         if (state.Mode == ConversationMode.Onboarding)
         {
-            // During onboarding, ignore text messages
+            // Handle text input during custom reminders step
+            if (state.OnboardingStep == OnboardingStep.CustomReminders)
+            {
+                await _onboardingHandler.HandleCustomRemindersTextAsync(message, state, ct);
+                return;
+            }
+            // During onboarding, ignore other text messages
             return;
         }
 
