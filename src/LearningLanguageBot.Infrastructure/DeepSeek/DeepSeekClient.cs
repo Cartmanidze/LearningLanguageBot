@@ -48,7 +48,7 @@ public class DeepSeekClient
 
         try
         {
-            var response = await _httpClient.PostAsJsonAsync("/chat/completions", request, JsonOptions, ct);
+            var response = await _httpClient.PostAsJsonAsync($"{_options.BaseUrl}/chat/completions", request, JsonOptions, ct);
             response.EnsureSuccessStatusCode();
 
             var result = await response.Content.ReadFromJsonAsync<ChatResponse>(JsonOptions, ct);
