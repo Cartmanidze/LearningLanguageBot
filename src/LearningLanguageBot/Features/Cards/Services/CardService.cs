@@ -106,6 +106,39 @@ public class CardService
             .CountAsync(c => c.UserId == userId && c.NextReviewAt <= now, ct);
     }
 
+    public async Task<(List<Card> cards, int totalCount)> GetUserCardsAsync(
+        long userId,
+        string? searchQuery,
+        int page,
+        int pageSize,
+        CancellationToken ct = default)
+    {
+        var query = _db.Cards.Where(c => c.UserId == userId);
+
+        if (!string.IsNullOrWhiteSpace(searchQuery))
+        {
+            var search = searchQuery.Trim().ToLower();
+            query = query.Where(c =>
+                c.Front.ToLower().Contains(search) ||
+                c.Back.ToLower().Contains(search));
+        }
+
+        var totalCount = await query.CountAsync(ct);
+
+        var cards = await query
+            .OrderByDescending(c => c.CreatedAt)
+            .Skip(page * pageSize)
+            .Take(pageSize)
+            .ToListAsync(ct);
+
+        return (cards, totalCount);
+    }
+
+    public async Task<int> GetUserCardsCountAsync(long userId, CancellationToken ct = default)
+    {
+        return await _db.Cards.CountAsync(c => c.UserId == userId, ct);
+    }
+
     private static string FormatTranslation(string main, List<string> alternatives)
     {
         if (alternatives.Count == 0) return main;

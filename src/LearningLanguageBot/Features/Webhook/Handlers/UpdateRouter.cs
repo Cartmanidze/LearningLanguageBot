@@ -16,6 +16,7 @@ public class UpdateRouter
     private readonly ITelegramBotClient _bot;
     private readonly OnboardingHandler _onboardingHandler;
     private readonly CardCreationHandler _cardCreationHandler;
+    private readonly CardBrowserHandler _cardBrowserHandler;
     private readonly ReviewHandler _reviewHandler;
     private readonly SettingsHandler _settingsHandler;
     private readonly ConversationStateManager _stateManager;
@@ -25,6 +26,7 @@ public class UpdateRouter
         ITelegramBotClient bot,
         OnboardingHandler onboardingHandler,
         CardCreationHandler cardCreationHandler,
+        CardBrowserHandler cardBrowserHandler,
         ReviewHandler reviewHandler,
         SettingsHandler settingsHandler,
         ConversationStateManager stateManager,
@@ -33,6 +35,7 @@ public class UpdateRouter
         _bot = bot;
         _onboardingHandler = onboardingHandler;
         _cardCreationHandler = cardCreationHandler;
+        _cardBrowserHandler = cardBrowserHandler;
         _reviewHandler = reviewHandler;
         _settingsHandler = settingsHandler;
         _stateManager = stateManager;
@@ -79,6 +82,9 @@ public class UpdateRouter
                 case "/settings":
                     await _settingsHandler.HandleSettingsCommandAsync(message, ct);
                     return;
+                case "/cards":
+                    await _cardBrowserHandler.HandleCardsCommandAsync(message, ct);
+                    return;
                 case "/help":
                     await SendHelpAsync(message, ct);
                     return;
@@ -118,6 +124,14 @@ public class UpdateRouter
         if (state.Mode == ConversationMode.Settings)
         {
             await _settingsHandler.HandleTimeTextInputAsync(message, state, ct);
+            return;
+        }
+
+        // Handle search query input in card browser
+        if (state.Mode == ConversationMode.BrowsingCards &&
+            state.CardBrowser?.WaitingForSearchQuery == true)
+        {
+            await _cardBrowserHandler.HandleSearchTextAsync(message, state, ct);
             return;
         }
 
@@ -169,6 +183,13 @@ public class UpdateRouter
             return;
         }
 
+        // Card browser callbacks
+        if (data.StartsWith("cards:"))
+        {
+            await _cardBrowserHandler.HandleBrowserCallbackAsync(callback, ct);
+            return;
+        }
+
         await _bot.AnswerCallbackQuery(callback.Id, cancellationToken: ct);
     }
 
@@ -179,6 +200,7 @@ public class UpdateRouter
             "🤖 Команды бота:\n\n" +
             "/start — настроить бота\n" +
             "/learn — начать повторение\n" +
+            "/cards — мои карточки и поиск\n" +
             "/settings — изменить настройки\n" +
             "/help — эта справка\n\n" +
             "Просто отправь слово или фразу — я создам карточку!",

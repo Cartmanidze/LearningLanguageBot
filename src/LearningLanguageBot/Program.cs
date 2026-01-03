@@ -65,6 +65,7 @@ try
     // Features: Cards
     builder.Services.AddScoped<CardService>();
     builder.Services.AddScoped<CardCreationHandler>();
+    builder.Services.AddScoped<CardBrowserHandler>();
 
     // Features: Review
     builder.Services.AddScoped<ReviewService>();
