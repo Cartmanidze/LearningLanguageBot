@@ -26,34 +26,53 @@ public class CardService
 
         // Detect language and determine direction
         var inputLang = Languages.DetectLanguage(text);
-        var sourceLang = inputLang;
-        var targetLang = inputLang == user.NativeLanguage ? user.TargetLanguage : user.NativeLanguage;
+        var isNativeInput = inputLang == user.NativeLanguage;
 
-        // Check for duplicate
-        var normalizedText = text.Trim().ToLowerInvariant();
+        // Get translation from LLM
+        var translation = await _translationService.TranslateAsync(
+            text,
+            inputLang,
+            isNativeInput ? user.TargetLanguage : user.NativeLanguage,
+            ct);
+
+        // Card structure: Front = Native (Russian), Back = Target (English)
+        // Examples: Only in target language (English)
+        string front, back;
+        if (isNativeInput)
+        {
+            // User sent Russian → Front = Russian, Back = English translation
+            front = text.Trim();
+            back = FormatTranslation(translation.Translation, translation.Alternatives);
+        }
+        else
+        {
+            // User sent English → Front = Russian translation, Back = English original
+            front = FormatTranslation(translation.Translation, translation.Alternatives);
+            back = text.Trim();
+        }
+
+        // Check for duplicate by Front (native language)
+        var normalizedFront = front.ToLowerInvariant();
         var existing = await _db.Cards
-            .FirstOrDefaultAsync(c => c.UserId == userId && c.Front.ToLower() == normalizedText, ct);
+            .FirstOrDefaultAsync(c => c.UserId == userId && c.Front.ToLower() == normalizedFront, ct);
 
         if (existing != null)
         {
             return (existing, true);
         }
 
-        // Get translation from LLM
-        var translation = await _translationService.TranslateAsync(text, sourceLang, targetLang, ct);
-
         var card = new Card
         {
             UserId = userId,
-            Front = text.Trim(),
-            Back = FormatTranslation(translation.Translation, translation.Alternatives),
+            Front = front,
+            Back = back,
             Examples = translation.Examples.Select(e => new Example
             {
-                Original = e.Original,
-                Translated = e.Translated
+                Original = e.Original,  // Now only target language
+                Translated = string.Empty  // Not used anymore
             }).ToList(),
-            SourceLang = sourceLang,
-            TargetLang = targetLang,
+            SourceLang = user.NativeLanguage,
+            TargetLang = user.TargetLanguage,
             NextReviewAt = DateTime.UtcNow
         };
 

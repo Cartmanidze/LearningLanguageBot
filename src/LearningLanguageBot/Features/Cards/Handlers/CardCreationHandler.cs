@@ -231,7 +231,7 @@ public class CardCreationHandler
             result += "\n\n📚 Примеры:";
             foreach (var ex in card.Examples.Take(3))
             {
-                result += $"\n• {ex.Original} — {ex.Translated}";
+                result += $"\n• {ex.Original}";
             }
         }
 

@@ -11,7 +11,7 @@ public class TranslationService : ITranslationService
 
     private const string SystemPrompt = """
         Ты помощник для изучения языков.
-        Переводи слова/фразы и давай примеры использования.
+        Переводи слова/фразы и давай примеры использования на ЦЕЛЕВОМ языке.
         Отвечай ТОЛЬКО валидным JSON без markdown-разметки.
         """;
 
@@ -31,18 +31,20 @@ public class TranslationService : ITranslationService
         var targetLangName = GetLanguageName(targetLang);
 
         var userPrompt = $"""
-            Переведи слово/фразу и дай 2-3 примера использования.
+            Переведи слово/фразу и дай 2-3 примера использования НА ЦЕЛЕВОМ ЯЗЫКЕ ({targetLangName}).
 
             Текст: "{text}"
             Направление: {sourceLangName} → {targetLangName}
+
+            ВАЖНО: Примеры должны быть ТОЛЬКО на {targetLangName}!
 
             Верни JSON в формате:
             {"{"}
               "translation": "основной перевод",
               "alternatives": ["альтернатива1", "альтернатива2"],
               "examples": [
-                {"{"}"original": "пример на {sourceLangName}", "translated": "перевод примера"{"}"},
-                {"{"}"original": "ещё пример", "translated": "перевод"{"}"}
+                {"{"}"original": "пример на {targetLangName}"{"}"},
+                {"{"}"original": "ещё пример на {targetLangName}"{"}"}
               ]
             {"}"}
             """;
@@ -88,10 +90,12 @@ public class TranslationService : ITranslationService
         {
             foreach (var ex in exElement.EnumerateArray())
             {
-                examples.Add(new TranslationExample(
-                    ex.GetProperty("original").GetString() ?? string.Empty,
-                    ex.GetProperty("translated").GetString() ?? string.Empty
-                ));
+                var original = ex.GetProperty("original").GetString() ?? string.Empty;
+                // translated is now optional (examples are only in target language)
+                var translated = ex.TryGetProperty("translated", out var trProp)
+                    ? trProp.GetString() ?? string.Empty
+                    : string.Empty;
+                examples.Add(new TranslationExample(original, translated));
             }
         }
 

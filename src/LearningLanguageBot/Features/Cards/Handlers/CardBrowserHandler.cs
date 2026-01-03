@@ -249,7 +249,7 @@ public class CardBrowserHandler
         }
 
         var examples = card.Examples.Count > 0
-            ? "\n\nПримеры:\n" + string.Join("\n", card.Examples.Select(e => $"• {e.Original}\n  {e.Translated}"))
+            ? "\n\n📚 Примеры:\n" + string.Join("\n", card.Examples.Select(e => $"• {e.Original}"))
             : "";
 
         var text = $"📝 {card.Front}\n\n" +
