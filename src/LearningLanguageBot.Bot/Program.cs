@@ -72,18 +72,19 @@ try
 
     var host = builder.Build();
 
-    // Apply migrations
+    // Apply migrations and configure recurring jobs
     using (var scope = host.Services.CreateScope())
     {
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         await db.Database.MigrateAsync();
-    }
 
-    // Configure recurring jobs
-    RecurringJob.AddOrUpdate<ReminderBackgroundService>(
-        "send-reminders",
-        service => service.SendRemindersAsync(CancellationToken.None),
-        "* * * * *"); // Every minute
+        // Configure recurring jobs using IRecurringJobManager (requires JobStorage to be initialized)
+        var recurringJobManager = scope.ServiceProvider.GetRequiredService<IRecurringJobManager>();
+        recurringJobManager.AddOrUpdate<ReminderBackgroundService>(
+            "send-reminders",
+            service => service.SendRemindersAsync(CancellationToken.None),
+            "* * * * *"); // Every minute
+    }
 
     await host.RunAsync();
 }
