@@ -34,6 +34,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   - LLM-based word extraction with context examples
   - Ability to review, remove, and add more words before creating cards
 
+### Added
+- Interactive `/help` command with quick action buttons (Learn, Cards, Import, Settings)
+- Auto-registration of bot commands in Telegram menu on startup (visible when typing `/`)
+
 ### Improved
 - Enhanced logging for word import feature
   - Log extraction requests: requested word count, text length, user level

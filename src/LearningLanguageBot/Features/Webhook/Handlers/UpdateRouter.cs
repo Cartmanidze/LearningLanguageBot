@@ -9,6 +9,7 @@ using Microsoft.Extensions.Logging;
 using Telegram.Bot;
 using Telegram.Bot.Types;
 using Telegram.Bot.Types.Enums;
+using Telegram.Bot.Types.ReplyMarkups;
 
 namespace LearningLanguageBot.Features.Webhook.Handlers;
 
@@ -221,21 +222,75 @@ public class UpdateRouter
             return;
         }
 
+        // Help menu callbacks
+        if (data.StartsWith("help:"))
+        {
+            await HandleHelpCallbackAsync(callback, data, ct);
+            return;
+        }
+
+        await _bot.AnswerCallbackQuery(callback.Id, cancellationToken: ct);
+    }
+
+    private async Task HandleHelpCallbackAsync(CallbackQuery callback, string data, CancellationToken ct)
+    {
+        var chatId = callback.Message!.Chat.Id;
+        var userId = callback.From.Id;
+
+        // Create a fake message to reuse existing handlers
+        var fakeMessage = new Message
+        {
+            Chat = callback.Message.Chat,
+            From = callback.From,
+            Date = DateTime.UtcNow
+        };
+
+        switch (data)
+        {
+            case "help:learn":
+                await _reviewHandler.HandleLearnCommandAsync(fakeMessage, ct);
+                break;
+            case "help:cards":
+                await _cardBrowserHandler.HandleCardsCommandAsync(fakeMessage, ct);
+                break;
+            case "help:import":
+                await _importHandler.HandleImportCommandAsync(fakeMessage, ct);
+                break;
+            case "help:settings":
+                await _settingsHandler.HandleSettingsCommandAsync(fakeMessage, ct);
+                break;
+        }
+
         await _bot.AnswerCallbackQuery(callback.Id, cancellationToken: ct);
     }
 
     private async Task SendHelpAsync(Message message, CancellationToken ct)
     {
+        var keyboard = new InlineKeyboardMarkup(new[]
+        {
+            new[]
+            {
+                InlineKeyboardButton.WithCallbackData("📚 Учить", "help:learn"),
+                InlineKeyboardButton.WithCallbackData("🗂 Карточки", "help:cards")
+            },
+            new[]
+            {
+                InlineKeyboardButton.WithCallbackData("📥 Импорт", "help:import"),
+                InlineKeyboardButton.WithCallbackData("⚙️ Настройки", "help:settings")
+            }
+        });
+
         await _bot.SendMessage(
             message.Chat.Id,
-            "🤖 Команды бота:\n\n" +
-            "/start — настроить бота\n" +
-            "/learn — начать повторение\n" +
-            "/cards — мои карточки и поиск\n" +
-            "/import — импорт слов из статьи/текста/песни\n" +
-            "/settings — изменить настройки\n" +
-            "/help — эта справка\n\n" +
-            "Просто отправь слово или фразу — я создам карточку!",
+            "🤖 *Команды бота:*\n\n" +
+            "📚 /learn — начать повторение\n" +
+            "🗂 /cards — мои карточки и поиск\n" +
+            "📥 /import — импорт слов\n" +
+            "⚙️ /settings — настройки\n" +
+            "❓ /help — эта справка\n\n" +
+            "💡 Просто отправь слово — я создам карточку!",
+            parseMode: ParseMode.Markdown,
+            replyMarkup: keyboard,
             cancellationToken: ct);
     }
 }

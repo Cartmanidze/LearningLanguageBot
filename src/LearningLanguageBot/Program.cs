@@ -22,6 +22,7 @@ using Npgsql;
 using Serilog;
 using Telegram.Bot;
 using Telegram.Bot.Polling;
+using Telegram.Bot.Types;
 using Telegram.Bot.Types.Enums;
 
 Log.Logger = new LoggerConfiguration()
@@ -146,6 +147,9 @@ public class BotPollingService : BackgroundService
         var me = await _bot.GetMe(stoppingToken);
         _logger.LogInformation("Bot started: @{Username}", me.Username);
 
+        // Register bot commands in Telegram menu
+        await SetBotCommandsAsync(stoppingToken);
+
         var receiverOptions = new ReceiverOptions
         {
             AllowedUpdates = [UpdateType.Message, UpdateType.CallbackQuery],
@@ -166,6 +170,21 @@ public class BotPollingService : BackgroundService
             },
             receiverOptions: receiverOptions,
             cancellationToken: stoppingToken);
+    }
+
+    private async Task SetBotCommandsAsync(CancellationToken ct)
+    {
+        var commands = new[]
+        {
+            new BotCommand { Command = "learn", Description = "📚 Начать повторение карточек" },
+            new BotCommand { Command = "cards", Description = "🗂 Мои карточки и поиск" },
+            new BotCommand { Command = "import", Description = "📥 Импорт слов из текста/песни" },
+            new BotCommand { Command = "settings", Description = "⚙️ Настройки бота" },
+            new BotCommand { Command = "help", Description = "❓ Справка по командам" }
+        };
+
+        await _bot.SetMyCommands(commands, cancellationToken: ct);
+        _logger.LogInformation("Bot commands registered: {Count} commands", commands.Length);
     }
 }
 
