@@ -34,6 +34,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   - LLM-based word extraction with context examples
   - Ability to review, remove, and add more words before creating cards
 
+### Improved
+- Enhanced logging for word import feature
+  - Log extraction requests: requested word count, text length, user level
+  - Log extracted words: actual count and word list
+  - Log card creation: source title, created count, duplicate count
+  - Log user word removal during import review
+  - Log JSON parsing failures with partial content
+
 ### Fixed
 - Fixed review mode not being respected - now ReviewHandler checks user's ReviewMode setting
 - Fixed JSONB serialization error for `List<TimeOnly>` (ReminderTimes) by enabling dynamic JSON on NpgsqlDataSource (Npgsql 8.0+ breaking change)

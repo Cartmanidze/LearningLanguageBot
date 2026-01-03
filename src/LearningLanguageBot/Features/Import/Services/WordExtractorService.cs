@@ -27,6 +27,9 @@ public class WordExtractorService
         int maxWords,
         CancellationToken ct = default)
     {
+        _logger.LogInformation("Extracting words: requested={MaxWords}, textLength={TextLength}, level={Level}",
+            maxWords, text.Length, userLevel);
+
         // Truncate text if too long (LLM context limit)
         var truncatedText = text.Length > 8000 ? text[..8000] + "..." : text;
 
@@ -55,7 +58,12 @@ public class WordExtractorService
         try
         {
             var response = await _client.ChatAsync(SystemPrompt, userPrompt, ct);
-            return ParseExtractedWords(response);
+            var words = ParseExtractedWords(response);
+
+            _logger.LogInformation("Words extracted: count={Count}, words=[{Words}]",
+                words.Count, string.Join(", ", words.Select(w => w.Word)));
+
+            return words;
         }
         catch (Exception ex)
         {
@@ -64,7 +72,7 @@ public class WordExtractorService
         }
     }
 
-    private static List<ExtractedWord> ParseExtractedWords(string json)
+    private List<ExtractedWord> ParseExtractedWords(string json)
     {
         // Remove potential markdown code blocks
         json = json.Trim();
@@ -82,8 +90,9 @@ public class WordExtractorService
             });
             return words ?? [];
         }
-        catch
+        catch (Exception ex)
         {
+            _logger.LogWarning(ex, "Failed to parse extracted words JSON: {Json}", json[..Math.Min(200, json.Length)]);
             return [];
         }
     }

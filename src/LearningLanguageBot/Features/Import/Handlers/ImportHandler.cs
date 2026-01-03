@@ -172,7 +172,9 @@ public class ImportHandler
             {
                 if (index >= 0 && index < importState.ExtractedWords.Count)
                 {
+                    var removedWord = importState.ExtractedWords[index].Word;
                     importState.ExtractedWords.RemoveAt(index);
+                    _logger.LogInformation("User removed word from import: userId={UserId}, word={Word}", userId, removedWord);
                     await ShowExtractedWordsAsync(callback.Message!.Chat.Id, callback.Message.MessageId, state, ct);
                 }
             }
@@ -460,6 +462,9 @@ public class ImportHandler
         var importState = state.ImportState!;
         var words = importState.ExtractedWords!;
 
+        _logger.LogInformation("Creating cards from import: userId={UserId}, wordsCount={Count}, source={Source}",
+            userId, words.Count, importState.SourceTitle ?? "unknown");
+
         await _bot.EditMessageText(
             callback.Message!.Chat.Id,
             callback.Message.MessageId,
@@ -485,6 +490,9 @@ public class ImportHandler
                 _logger.LogWarning(ex, "Failed to create card for word: {Word}", word.Word);
             }
         }
+
+        _logger.LogInformation("Import completed: userId={UserId}, created={Created}, duplicates={Duplicates}, source={Source}",
+            userId, created, duplicates, importState.SourceTitle ?? "unknown");
 
         state.Mode = ConversationMode.Normal;
         state.ImportState = null;
