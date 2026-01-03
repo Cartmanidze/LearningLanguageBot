@@ -7,6 +7,7 @@ using LearningLanguageBot.Features.Onboarding.Services;
 using LearningLanguageBot.Features.Reminders.Services;
 using LearningLanguageBot.Features.Review.Handlers;
 using LearningLanguageBot.Features.Review.Services;
+using LearningLanguageBot.Features.Settings.Handlers;
 using LearningLanguageBot.Features.Webhook.Handlers;
 using LearningLanguageBot.Infrastructure.Database;
 using LearningLanguageBot.Infrastructure.State;
@@ -68,6 +69,9 @@ try
     // Features: Review
     builder.Services.AddScoped<ReviewService>();
     builder.Services.AddScoped<ReviewHandler>();
+
+    // Features: Settings
+    builder.Services.AddScoped<SettingsHandler>();
 
     // Features: Reminders
     builder.Services.AddScoped<ReminderJob>();

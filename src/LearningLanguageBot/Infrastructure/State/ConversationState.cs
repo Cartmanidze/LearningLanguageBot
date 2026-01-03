@@ -47,7 +47,8 @@ public enum ConversationMode
     Normal,
     Onboarding,
     EditingCard,
-    Reviewing
+    Reviewing,
+    Settings
 }
 
 public enum OnboardingStep

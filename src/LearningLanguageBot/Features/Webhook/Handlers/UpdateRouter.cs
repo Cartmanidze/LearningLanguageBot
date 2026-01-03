@@ -1,6 +1,7 @@
 using LearningLanguageBot.Features.Cards.Handlers;
 using LearningLanguageBot.Features.Onboarding.Handlers;
 using LearningLanguageBot.Features.Review.Handlers;
+using LearningLanguageBot.Features.Settings.Handlers;
 using LearningLanguageBot.Infrastructure.Constants;
 using LearningLanguageBot.Infrastructure.State;
 using Microsoft.Extensions.Logging;
@@ -16,6 +17,7 @@ public class UpdateRouter
     private readonly OnboardingHandler _onboardingHandler;
     private readonly CardCreationHandler _cardCreationHandler;
     private readonly ReviewHandler _reviewHandler;
+    private readonly SettingsHandler _settingsHandler;
     private readonly ConversationStateManager _stateManager;
     private readonly ILogger<UpdateRouter> _logger;
 
@@ -24,6 +26,7 @@ public class UpdateRouter
         OnboardingHandler onboardingHandler,
         CardCreationHandler cardCreationHandler,
         ReviewHandler reviewHandler,
+        SettingsHandler settingsHandler,
         ConversationStateManager stateManager,
         ILogger<UpdateRouter> logger)
     {
@@ -31,6 +34,7 @@ public class UpdateRouter
         _onboardingHandler = onboardingHandler;
         _cardCreationHandler = cardCreationHandler;
         _reviewHandler = reviewHandler;
+        _settingsHandler = settingsHandler;
         _stateManager = stateManager;
         _logger = logger;
     }
@@ -72,6 +76,9 @@ public class UpdateRouter
                 case "/learn":
                     await _reviewHandler.HandleLearnCommandAsync(message, ct);
                     return;
+                case "/settings":
+                    await _settingsHandler.HandleSettingsCommandAsync(message, ct);
+                    return;
                 case "/help":
                     await SendHelpAsync(message, ct);
                     return;
@@ -104,6 +111,13 @@ public class UpdateRouter
             state.ActiveReview?.WaitingForTypedAnswer == true)
         {
             await _reviewHandler.HandleTypedAnswerAsync(message, state, ct);
+            return;
+        }
+
+        // Handle custom time input in Settings
+        if (state.Mode == ConversationMode.Settings)
+        {
+            await _settingsHandler.HandleTimeTextInputAsync(message, state, ct);
             return;
         }
 
@@ -148,6 +162,13 @@ public class UpdateRouter
             return;
         }
 
+        // Settings callbacks
+        if (data.StartsWith("settings:"))
+        {
+            await _settingsHandler.HandleSettingsCallbackAsync(callback, ct);
+            return;
+        }
+
         await _bot.AnswerCallbackQuery(callback.Id, cancellationToken: ct);
     }
 
@@ -158,6 +179,7 @@ public class UpdateRouter
             "🤖 Команды бота:\n\n" +
             "/start — настроить бота\n" +
             "/learn — начать повторение\n" +
+            "/settings — изменить настройки\n" +
             "/help — эта справка\n\n" +
             "Просто отправь слово или фразу — я создам карточку!",
             cancellationToken: ct);
