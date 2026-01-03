@@ -8,7 +8,7 @@ on:
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_NAME: ${{ github.repository_owner }}/learninglanguagebot
+  IMAGE_NAME: cartmanidze/learninglanguagebot
 
 jobs:
   build-and-push:
@@ -75,7 +75,7 @@ jobs:
             cd /opt/learninglanguagebot
 
             # Login to GitHub Container Registry
-            echo $CR_PAT | docker login ghcr.io -u ${{ github.repository_owner }} --password-stdin
+            echo $CR_PAT | docker login ghcr.io -u cartmanidze --password-stdin
 
             # Pull latest image
             docker pull $IMAGE
