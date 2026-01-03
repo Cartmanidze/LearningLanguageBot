@@ -3,10 +3,7 @@ WORKDIR /src
 
 # Copy solution and project files
 COPY LearningLanguageBot.sln .
-COPY src/LearningLanguageBot.Bot/LearningLanguageBot.Bot.csproj src/LearningLanguageBot.Bot/
-COPY src/LearningLanguageBot.Core/LearningLanguageBot.Core.csproj src/LearningLanguageBot.Core/
-COPY src/LearningLanguageBot.Infrastructure/LearningLanguageBot.Infrastructure.csproj src/LearningLanguageBot.Infrastructure/
-COPY src/LearningLanguageBot.Shared/LearningLanguageBot.Shared.csproj src/LearningLanguageBot.Shared/
+COPY src/LearningLanguageBot/LearningLanguageBot.csproj src/LearningLanguageBot/
 
 # Restore packages
 RUN dotnet restore
@@ -15,7 +12,7 @@ RUN dotnet restore
 COPY src/ src/
 
 # Build and publish
-RUN dotnet publish src/LearningLanguageBot.Bot/LearningLanguageBot.Bot.csproj \
+RUN dotnet publish src/LearningLanguageBot/LearningLanguageBot.csproj \
     -c Release \
     -o /app/publish \
     --no-restore
@@ -26,4 +23,4 @@ WORKDIR /app
 
 COPY --from=build /app/publish .
 
-ENTRYPOINT ["dotnet", "LearningLanguageBot.Bot.dll"]
+ENTRYPOINT ["dotnet", "LearningLanguageBot.dll"]
