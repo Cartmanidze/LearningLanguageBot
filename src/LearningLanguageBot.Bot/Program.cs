@@ -1,6 +1,7 @@
 using Hangfire;
 using Hangfire.PostgreSql;
 using LearningLanguageBot.Bot.Handlers;
+using Npgsql;
 using LearningLanguageBot.Bot.Services;
 using LearningLanguageBot.Bot.State;
 using LearningLanguageBot.Core.Interfaces;
@@ -34,9 +35,13 @@ try
     var connectionString = builder.Configuration.GetConnectionString("DefaultConnection")
         ?? throw new InvalidOperationException("ConnectionString is not configured");
 
-    // Database
+    // Database - use NpgsqlDataSourceBuilder to enable dynamic JSON for List<TimeOnly>
+    var dataSourceBuilder = new NpgsqlDataSourceBuilder(connectionString);
+    dataSourceBuilder.EnableDynamicJson();
+    var dataSource = dataSourceBuilder.Build();
+
     builder.Services.AddDbContext<AppDbContext>(options =>
-        options.UseNpgsql(connectionString));
+        options.UseNpgsql(dataSource));
 
     // Telegram Bot
     builder.Services.AddSingleton<ITelegramBotClient>(new TelegramBotClient(telegramToken));
