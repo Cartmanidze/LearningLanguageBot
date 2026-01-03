@@ -23,8 +23,20 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Custom reminder time selection during onboarding
   - Quick buttons: Morning (9:00), Day (14:00), Evening (20:00), All three
   - Text input: parse times like "9:00, 14:00, 20:00" or just "9 14 20"
+- `/cards` command for browsing cards with pagination and search
+- `/settings` command for changing language, reminder times, review mode, and timezone
+- Timezone support for reminders (15 timezones including Russian cities, Europe, Asia, Americas)
+- `/import` command for importing words from various sources
+  - URL import: fetch articles from Medium, BBC, NYTimes, Wikipedia, etc.
+  - Text import: paste any text and extract useful words
+  - File import: upload .txt files
+  - Song lyrics import: Genius, AZLyrics, Lyrics.com
+  - LLM-based word extraction with context examples
+  - Ability to review, remove, and add more words before creating cards
 
 ### Fixed
 - Fixed review mode not being respected - now ReviewHandler checks user's ReviewMode setting
 - Fixed JSONB serialization error for `List<TimeOnly>` (ReminderTimes) by enabling dynamic JSON on NpgsqlDataSource (Npgsql 8.0+ breaking change)
 - Fixed OpenRouter API URL - use full URL instead of relative path to avoid HttpClient BaseAddress path replacement issue
+- Fixed card structure: Front = Russian (native), Back = English (target)
+- Fixed examples to be generated only in target language

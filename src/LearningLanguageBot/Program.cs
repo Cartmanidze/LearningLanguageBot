@@ -2,6 +2,8 @@ using Hangfire;
 using Hangfire.PostgreSql;
 using LearningLanguageBot.Features.Cards.Handlers;
 using LearningLanguageBot.Features.Cards.Services;
+using LearningLanguageBot.Features.Import.Handlers;
+using LearningLanguageBot.Features.Import.Services;
 using LearningLanguageBot.Features.Onboarding.Handlers;
 using LearningLanguageBot.Features.Onboarding.Services;
 using LearningLanguageBot.Features.Reminders.Services;
@@ -73,6 +75,11 @@ try
 
     // Features: Settings
     builder.Services.AddScoped<SettingsHandler>();
+
+    // Features: Import
+    builder.Services.AddHttpClient<ContentFetcherService>();
+    builder.Services.AddScoped<WordExtractorService>();
+    builder.Services.AddScoped<ImportHandler>();
 
     // Features: Reminders
     builder.Services.AddScoped<ReminderJob>();

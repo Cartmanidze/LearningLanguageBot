@@ -1,4 +1,5 @@
 using LearningLanguageBot.Features.Cards.Handlers;
+using LearningLanguageBot.Features.Import.Handlers;
 using LearningLanguageBot.Features.Onboarding.Handlers;
 using LearningLanguageBot.Features.Review.Handlers;
 using LearningLanguageBot.Features.Settings.Handlers;
@@ -19,6 +20,7 @@ public class UpdateRouter
     private readonly CardBrowserHandler _cardBrowserHandler;
     private readonly ReviewHandler _reviewHandler;
     private readonly SettingsHandler _settingsHandler;
+    private readonly ImportHandler _importHandler;
     private readonly ConversationStateManager _stateManager;
     private readonly ILogger<UpdateRouter> _logger;
 
@@ -29,6 +31,7 @@ public class UpdateRouter
         CardBrowserHandler cardBrowserHandler,
         ReviewHandler reviewHandler,
         SettingsHandler settingsHandler,
+        ImportHandler importHandler,
         ConversationStateManager stateManager,
         ILogger<UpdateRouter> logger)
     {
@@ -38,6 +41,7 @@ public class UpdateRouter
         _cardBrowserHandler = cardBrowserHandler;
         _reviewHandler = reviewHandler;
         _settingsHandler = settingsHandler;
+        _importHandler = importHandler;
         _stateManager = stateManager;
         _logger = logger;
     }
@@ -84,6 +88,9 @@ public class UpdateRouter
                     return;
                 case "/cards":
                     await _cardBrowserHandler.HandleCardsCommandAsync(message, ct);
+                    return;
+                case "/import":
+                    await _importHandler.HandleImportCommandAsync(message, ct);
                     return;
                 case "/help":
                     await SendHelpAsync(message, ct);
@@ -133,6 +140,23 @@ public class UpdateRouter
         {
             await _cardBrowserHandler.HandleSearchTextAsync(message, state, ct);
             return;
+        }
+
+        // Handle import mode
+        if (state.Mode == ConversationMode.Importing)
+        {
+            // Handle file upload
+            if (message.Document != null)
+            {
+                await _importHandler.HandleImportFileAsync(message, state, ct);
+                return;
+            }
+            // Handle text/URL input
+            if (!string.IsNullOrWhiteSpace(text))
+            {
+                await _importHandler.HandleImportTextAsync(message, state, ct);
+                return;
+            }
         }
 
         // Default: create card from text
@@ -190,6 +214,13 @@ public class UpdateRouter
             return;
         }
 
+        // Import callbacks
+        if (data.StartsWith("import:"))
+        {
+            await _importHandler.HandleImportCallbackAsync(callback, ct);
+            return;
+        }
+
         await _bot.AnswerCallbackQuery(callback.Id, cancellationToken: ct);
     }
 
@@ -201,6 +232,7 @@ public class UpdateRouter
             "/start — настроить бота\n" +
             "/learn — начать повторение\n" +
             "/cards — мои карточки и поиск\n" +
+            "/import — импорт слов из статьи/текста/песни\n" +
             "/settings — изменить настройки\n" +
             "/help — эта справка\n\n" +
             "Просто отправь слово или фразу — я создам карточку!",

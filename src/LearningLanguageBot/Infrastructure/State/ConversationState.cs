@@ -38,6 +38,7 @@ public class UserState
     public ReviewSession? ActiveReview { get; set; }
     public List<TimeOnly> SelectedReminderTimes { get; set; } = [];
     public CardBrowserState? CardBrowser { get; set; }
+    public ImportState? ImportState { get; set; }
     public DateTime LastActivity { get; set; } = DateTime.UtcNow;
 
     public void Touch() => LastActivity = DateTime.UtcNow;
@@ -58,7 +59,8 @@ public enum ConversationMode
     EditingCard,
     Reviewing,
     Settings,
-    BrowsingCards
+    BrowsingCards,
+    Importing
 }
 
 public enum OnboardingStep
@@ -91,4 +93,27 @@ public class ReviewSession
     public Guid CurrentCardId => CardIds.ElementAtOrDefault(CurrentIndex);
     public bool IsComplete => CurrentIndex >= CardIds.Count;
     public int TotalCards => CardIds.Count;
+}
+
+public class ImportState
+{
+    public ImportSource Source { get; set; }
+    public bool WaitingForInput { get; set; }
+    public string? SourceText { get; set; }
+    public string? SourceTitle { get; set; }
+    public List<ExtractedWordState>? ExtractedWords { get; set; }
+}
+
+public class ExtractedWordState
+{
+    public string Word { get; set; } = string.Empty;
+    public string Context { get; set; } = string.Empty;
+}
+
+public enum ImportSource
+{
+    Url,
+    Text,
+    File,
+    Song
 }
