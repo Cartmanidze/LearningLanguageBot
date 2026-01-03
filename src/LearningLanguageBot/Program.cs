@@ -78,6 +78,8 @@ try
 
     // Features: Import
     builder.Services.AddHttpClient<ContentFetcherService>();
+    builder.Services.Configure<GeniusOptions>(builder.Configuration.GetSection(GeniusOptions.SectionName));
+    builder.Services.AddHttpClient<GeniusService>();
     builder.Services.AddScoped<WordExtractorService>();
     builder.Services.AddScoped<ImportHandler>();
 

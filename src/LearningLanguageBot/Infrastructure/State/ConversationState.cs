@@ -102,6 +102,18 @@ public class ImportState
     public string? SourceText { get; set; }
     public string? SourceTitle { get; set; }
     public List<ExtractedWordState>? ExtractedWords { get; set; }
+
+    // Song search
+    public List<SongSearchResultState>? SongSearchResults { get; set; }
+    public bool WaitingForSongSelection { get; set; }
+}
+
+public class SongSearchResultState
+{
+    public long Id { get; set; }
+    public string Title { get; set; } = string.Empty;
+    public string Artist { get; set; } = string.Empty;
+    public string Url { get; set; } = string.Empty;
 }
 
 public class ExtractedWordState

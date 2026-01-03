@@ -14,6 +14,7 @@ public class ImportHandler
     private readonly ITelegramBotClient _bot;
     private readonly WordExtractorService _wordExtractor;
     private readonly ContentFetcherService _contentFetcher;
+    private readonly GeniusService _geniusService;
     private readonly CardService _cardService;
     private readonly UserService _userService;
     private readonly ConversationStateManager _stateManager;
@@ -25,6 +26,7 @@ public class ImportHandler
         ITelegramBotClient bot,
         WordExtractorService wordExtractor,
         ContentFetcherService contentFetcher,
+        GeniusService geniusService,
         CardService cardService,
         UserService userService,
         ConversationStateManager stateManager,
@@ -33,6 +35,7 @@ public class ImportHandler
         _bot = bot;
         _wordExtractor = wordExtractor;
         _contentFetcher = contentFetcher;
+        _geniusService = geniusService;
         _cardService = cardService;
         _userService = userService;
         _stateManager = stateManager;
@@ -141,10 +144,18 @@ public class ImportHandler
             await _bot.EditMessageText(
                 callback.Message!.Chat.Id,
                 callback.Message.MessageId,
-                "🎵 Отправь ссылку на текст песни:\n\n" +
-                "Поддерживаются: Genius, AZLyrics, Lyrics.com",
+                "🎵 Введи название песни и исполнителя:\n\n" +
+                "Например: \"Shape of You Ed Sheeran\"",
                 replyMarkup: CancelKeyboard(),
                 cancellationToken: ct);
+        }
+        else if (data.StartsWith("import:song:"))
+        {
+            var indexStr = data.Replace("import:song:", "");
+            if (int.TryParse(indexStr, out var index))
+            {
+                await HandleSongSelectionAsync(callback, state, index, ct);
+            }
         }
         else if (data == "import:confirm")
         {
@@ -182,8 +193,15 @@ public class ImportHandler
         var text = message.Text ?? string.Empty;
         importState.WaitingForInput = false;
 
+        // Handle song search
+        if (importState.Source == ImportSource.Song)
+        {
+            await SearchAndShowSongsAsync(message.Chat.Id, text, state, ct);
+            return;
+        }
+
         // Handle URL input
-        if (importState.Source is ImportSource.Url or ImportSource.Song)
+        if (importState.Source == ImportSource.Url)
         {
             if (!Uri.TryCreate(text, UriKind.Absolute, out _))
             {
@@ -480,6 +498,102 @@ public class ImportHandler
             callback.Message.MessageId,
             resultText,
             cancellationToken: ct);
+    }
+
+    private async Task SearchAndShowSongsAsync(long chatId, string query, UserState state, CancellationToken ct)
+    {
+        var importState = state.ImportState!;
+
+        var loadingMsg = await _bot.SendMessage(
+            chatId,
+            "🔍 Ищу песню...",
+            cancellationToken: ct);
+
+        var results = await _geniusService.SearchSongsAsync(query, 5, ct);
+
+        if (results.Count == 0)
+        {
+            await _bot.EditMessageText(
+                chatId,
+                loadingMsg.MessageId,
+                "❌ Песня не найдена. Попробуй другой запрос:",
+                replyMarkup: CancelKeyboard(),
+                cancellationToken: ct);
+            importState.WaitingForInput = true;
+            return;
+        }
+
+        // Store results in state
+        importState.SongSearchResults = results.Select(r => new SongSearchResultState
+        {
+            Id = r.Id,
+            Title = r.Title,
+            Artist = r.Artist,
+            Url = r.Url
+        }).ToList();
+        importState.WaitingForSongSelection = true;
+
+        // Build keyboard with song options
+        var buttons = results.Select((song, index) => new[]
+        {
+            InlineKeyboardButton.WithCallbackData(
+                $"🎵 {song.Artist} — {song.Title}"[..Math.Min(60, $"🎵 {song.Artist} — {song.Title}".Length)],
+                $"import:song:{index}")
+        }).ToList();
+
+        buttons.Add(new[] { InlineKeyboardButton.WithCallbackData("❌ Отмена", "import:cancel") });
+
+        await _bot.EditMessageText(
+            chatId,
+            loadingMsg.MessageId,
+            $"🎵 Найдено {results.Count} песен:\n\nВыбери нужную:",
+            replyMarkup: new InlineKeyboardMarkup(buttons),
+            cancellationToken: ct);
+    }
+
+    private async Task HandleSongSelectionAsync(CallbackQuery callback, UserState state, int index, CancellationToken ct)
+    {
+        var importState = state.ImportState;
+        if (importState?.SongSearchResults == null || index >= importState.SongSearchResults.Count)
+        {
+            await _bot.AnswerCallbackQuery(callback.Id, "Ошибка выбора", cancellationToken: ct);
+            return;
+        }
+
+        var selectedSong = importState.SongSearchResults[index];
+        importState.WaitingForSongSelection = false;
+
+        await _bot.EditMessageText(
+            callback.Message!.Chat.Id,
+            callback.Message.MessageId,
+            $"🎵 {selectedSong.Artist} — {selectedSong.Title}\n\n⏳ Загружаю текст...",
+            replyMarkup: null,
+            cancellationToken: ct);
+
+        // Fetch lyrics from the URL
+        var content = await _contentFetcher.FetchContentAsync(selectedSong.Url, ct);
+        if (!content.Success)
+        {
+            await _bot.EditMessageText(
+                callback.Message.Chat.Id,
+                callback.Message.MessageId,
+                $"❌ Не удалось загрузить текст песни: {content.Error}",
+                cancellationToken: ct);
+            state.Mode = ConversationMode.Normal;
+            state.ImportState = null;
+            return;
+        }
+
+        importState.SourceText = content.Text;
+        importState.SourceTitle = $"{selectedSong.Artist} — {selectedSong.Title}";
+
+        await _bot.EditMessageText(
+            callback.Message.Chat.Id,
+            callback.Message.MessageId,
+            $"✅ {selectedSong.Artist} — {selectedSong.Title}\n\n⏳ Извлекаю слова...",
+            cancellationToken: ct);
+
+        await ExtractAndShowWordsAsync(callback.Message.Chat.Id, callback.Message.MessageId, state, ct);
     }
 
     private static InlineKeyboardMarkup CancelKeyboard() =>

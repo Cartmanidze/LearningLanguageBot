@@ -30,7 +30,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   - URL import: fetch articles from Medium, BBC, NYTimes, Wikipedia, etc.
   - Text import: paste any text and extract useful words
   - File import: upload .txt files
-  - Song lyrics import: Genius, AZLyrics, Lyrics.com
+  - Song lyrics import with Genius API search by song name
   - LLM-based word extraction with context examples
   - Ability to review, remove, and add more words before creating cards
 
