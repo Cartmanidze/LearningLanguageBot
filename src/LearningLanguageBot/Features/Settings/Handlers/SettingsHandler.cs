@@ -98,6 +98,18 @@ public class SettingsHandler
             state.SelectedReminderTimes = user.ReminderTimes.ToList();
             await ShowTimeSettingsAsync(callback.Message!.Chat.Id, callback.Message.MessageId, state, ct);
         }
+        // Change timezone
+        else if (data == "settings:timezone")
+        {
+            await ShowTimezoneSettingsAsync(callback, user, ct);
+        }
+        else if (data.StartsWith("settings:tz:"))
+        {
+            var tz = data.Replace("settings:tz:", "");
+            await _userService.UpdateUserSettingsAsync(userId, timeZone: tz, ct: ct);
+            user = await _userService.GetUserAsync(userId, ct);
+            await ShowSettingsMenuAsync(callback.Message!.Chat.Id, callback.Message.MessageId, user!, ct);
+        }
         else if (data == "settings:time:9" || data == "settings:time:14" || data == "settings:time:20")
         {
             var hour = int.Parse(data.Replace("settings:time:", ""));
@@ -168,11 +180,13 @@ public class SettingsHandler
     {
         var modeName = user.ReviewMode == ReviewMode.Typing ? "Печатать" : "Вспоминать";
         var timesStr = string.Join(", ", user.ReminderTimes.OrderBy(t => t).Select(t => t.ToString("HH:mm")));
+        var tzDisplay = GetTimezoneDisplayName(user.TimeZone);
 
         var text = "⚙️ Настройки\n\n" +
                    $"📝 Режим: {modeName}\n" +
                    $"🎯 Цель: {user.DailyGoal} карточек/день\n" +
-                   $"⏰ Напоминания: {timesStr}";
+                   $"⏰ Напоминания: {timesStr}\n" +
+                   $"🌍 Часовой пояс: {tzDisplay}";
 
         var keyboard = new InlineKeyboardMarkup(new[]
         {
@@ -183,7 +197,8 @@ public class SettingsHandler
             },
             new[]
             {
-                InlineKeyboardButton.WithCallbackData("⏰ Время", "settings:time")
+                InlineKeyboardButton.WithCallbackData("⏰ Время", "settings:time"),
+                InlineKeyboardButton.WithCallbackData("🌍 Пояс", "settings:timezone")
             }
         });
 
@@ -305,4 +320,84 @@ public class SettingsHandler
 
         return times.Distinct().OrderBy(t => t).ToList();
     }
+
+    private async Task ShowTimezoneSettingsAsync(CallbackQuery callback, User user, CancellationToken ct)
+    {
+        string Check(string tz) => user.TimeZone == tz ? "✓ " : "";
+
+        var keyboard = new InlineKeyboardMarkup(new[]
+        {
+            // Row 1: Europe
+            new[]
+            {
+                InlineKeyboardButton.WithCallbackData($"{Check("Europe/London")}Лондон", "settings:tz:Europe/London"),
+                InlineKeyboardButton.WithCallbackData($"{Check("Europe/Berlin")}Берлин", "settings:tz:Europe/Berlin"),
+                InlineKeyboardButton.WithCallbackData($"{Check("Europe/Kiev")}Киев", "settings:tz:Europe/Kiev")
+            },
+            // Row 2: Russia West
+            new[]
+            {
+                InlineKeyboardButton.WithCallbackData($"{Check("Europe/Kaliningrad")}Калининград", "settings:tz:Europe/Kaliningrad"),
+                InlineKeyboardButton.WithCallbackData($"{Check("Europe/Moscow")}Москва", "settings:tz:Europe/Moscow"),
+                InlineKeyboardButton.WithCallbackData($"{Check("Europe/Samara")}Самара", "settings:tz:Europe/Samara")
+            },
+            // Row 3: Russia East
+            new[]
+            {
+                InlineKeyboardButton.WithCallbackData($"{Check("Asia/Yekaterinburg")}Екб", "settings:tz:Asia/Yekaterinburg"),
+                InlineKeyboardButton.WithCallbackData($"{Check("Asia/Omsk")}Омск", "settings:tz:Asia/Omsk"),
+                InlineKeyboardButton.WithCallbackData($"{Check("Asia/Novosibirsk")}Нск", "settings:tz:Asia/Novosibirsk")
+            },
+            new[]
+            {
+                InlineKeyboardButton.WithCallbackData($"{Check("Asia/Vladivostok")}Владивосток", "settings:tz:Asia/Vladivostok")
+            },
+            // Row 4: Asia
+            new[]
+            {
+                InlineKeyboardButton.WithCallbackData($"{Check("Asia/Dubai")}Дубай", "settings:tz:Asia/Dubai"),
+                InlineKeyboardButton.WithCallbackData($"{Check("Asia/Bangkok")}Бангкок", "settings:tz:Asia/Bangkok"),
+                InlineKeyboardButton.WithCallbackData($"{Check("Asia/Singapore")}Сингапур", "settings:tz:Asia/Singapore")
+            },
+            // Row 5: Americas
+            new[]
+            {
+                InlineKeyboardButton.WithCallbackData($"{Check("America/New_York")}Нью-Йорк", "settings:tz:America/New_York"),
+                InlineKeyboardButton.WithCallbackData($"{Check("America/Los_Angeles")}Лос-Анджелес", "settings:tz:America/Los_Angeles")
+            },
+            // Back
+            new[]
+            {
+                InlineKeyboardButton.WithCallbackData("⬅️ Назад", "settings:main")
+            }
+        });
+
+        await _bot.EditMessageText(
+            callback.Message!.Chat.Id,
+            callback.Message.MessageId,
+            $"Текущий: {GetTimezoneDisplayName(user.TimeZone)}\n\n" +
+            "Выбери часовой пояс:",
+            replyMarkup: keyboard,
+            cancellationToken: ct);
+    }
+
+    private static string GetTimezoneDisplayName(string tzId) => tzId switch
+    {
+        "Europe/London" => "Лондон (UTC+0)",
+        "Europe/Berlin" => "Берлин (UTC+1)",
+        "Europe/Kiev" => "Киев (UTC+2)",
+        "Europe/Kaliningrad" => "Калининград (UTC+2)",
+        "Europe/Moscow" => "Москва (UTC+3)",
+        "Europe/Samara" => "Самара (UTC+4)",
+        "Asia/Yekaterinburg" => "Екатеринбург (UTC+5)",
+        "Asia/Omsk" => "Омск (UTC+6)",
+        "Asia/Novosibirsk" => "Новосибирск (UTC+7)",
+        "Asia/Vladivostok" => "Владивосток (UTC+10)",
+        "Asia/Dubai" => "Дубай (UTC+4)",
+        "Asia/Bangkok" => "Бангкок (UTC+7)",
+        "Asia/Singapore" => "Сингапур (UTC+8)",
+        "America/New_York" => "Нью-Йорк (UTC-5)",
+        "America/Los_Angeles" => "Лос-Анджелес (UTC-8)",
+        _ => tzId
+    };
 }

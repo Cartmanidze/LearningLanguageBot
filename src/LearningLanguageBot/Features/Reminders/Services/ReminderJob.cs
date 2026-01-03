@@ -18,23 +18,39 @@ public class ReminderJob
 
     public async Task<List<User>> GetUsersForReminderAsync(CancellationToken ct = default)
     {
-        var now = DateTime.UtcNow;
-        var currentTime = TimeOnly.FromDateTime(now);
-        var today = DateOnly.FromDateTime(now);
+        var utcNow = DateTime.UtcNow;
 
-        // Get users who have a reminder time within the last minute
-        // and haven't completed their daily goal
+        // Get users who haven't completed their daily goal
         var users = await _db.Users
             .Where(u => u.IsActive)
-            .Where(u => u.TodayDate != today || u.TodayReviewed < u.DailyGoal)
             .ToListAsync(ct);
 
         return users.Where(u =>
         {
-            // Check if current time matches any reminder time (within 1 minute window)
+            // Convert UTC to user's local time
+            TimeZoneInfo tz;
+            try
+            {
+                tz = TimeZoneInfo.FindSystemTimeZoneById(u.TimeZone);
+            }
+            catch
+            {
+                // Fallback to Moscow if timezone is invalid
+                tz = TimeZoneInfo.FindSystemTimeZoneById("Europe/Moscow");
+            }
+
+            var userLocalTime = TimeZoneInfo.ConvertTimeFromUtc(utcNow, tz);
+            var userToday = DateOnly.FromDateTime(userLocalTime);
+            var userCurrentTime = TimeOnly.FromDateTime(userLocalTime);
+
+            // Skip if user already completed daily goal today (in their timezone)
+            if (u.TodayDate == userToday && u.TodayReviewed >= u.DailyGoal)
+                return false;
+
+            // Check if current local time matches any reminder time (within 1 minute window)
             return u.ReminderTimes.Any(rt =>
             {
-                var diff = Math.Abs((currentTime.ToTimeSpan() - rt.ToTimeSpan()).TotalMinutes);
+                var diff = Math.Abs((userCurrentTime.ToTimeSpan() - rt.ToTimeSpan()).TotalMinutes);
                 return diff < 1;
             });
         }).ToList();
