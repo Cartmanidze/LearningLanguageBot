@@ -1,0 +1,10 @@
+**/bin/
+**/obj/
+**/.vs/
+**/.idea/
+**/.git/
+**/.claude/
+*.md
+.env
+.env.*
+!.env.example

@@ -1,0 +1,74 @@
+# Build results
+[Dd]ebug/
+[Rr]elease/
+x64/
+x86/
+[Ww][Ii][Nn]32/
+[Aa][Rr][Mm]/
+[Aa][Rr][Mm]64/
+bld/
+[Bb]in/
+[Oo]bj/
+[Oo]ut/
+[Ll]og/
+[Ll]ogs/
+
+# Visual Studio
+.vs/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# Rider
+.idea/
+
+# NuGet
+*.nupkg
+*.snupkg
+**/[Pp]ackages/*
+!**/[Pp]ackages/build/
+
+# Build outputs
+*.dll
+*.exe
+*.pdb
+*.ilk
+*.meta
+*.obj
+*.iobj
+*.pch
+*.ipch
+
+# Test results
+[Tt]est[Rr]esult*/
+*.trx
+coverage*.json
+coverage*.xml
+
+# Publish
+publish/
+
+# User-specific files
+*.rsuser
+*.DotSettings.user
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Secrets and config
+appsettings.*.json
+!appsettings.json
+!appsettings.Development.json
+*.env
+.env.*
+
+# Claude Code
+.claude/settings.local.json

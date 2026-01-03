@@ -1,0 +1,39 @@
+services:
+  bot:
+    build: .
+    container_name: learning-language-bot
+    restart: unless-stopped
+    environment:
+      - Telegram__BotToken=${TELEGRAM_BOT_TOKEN}
+      - DeepSeek__ApiKey=${DEEPSEEK_API_KEY}
+      - ConnectionStrings__DefaultConnection=Host=postgres;Database=learninglanguagebot;Username=postgres;Password=${POSTGRES_PASSWORD}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - bot-network
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: learning-language-bot-db
+    restart: unless-stopped
+    environment:
+      - POSTGRES_DB=learninglanguagebot
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - bot-network
+
+networks:
+  bot-network:
+    driver: bridge
+
+volumes:
+  postgres-data:
