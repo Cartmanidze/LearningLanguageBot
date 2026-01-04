@@ -47,6 +47,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   - Log JSON parsing failures with partial content
 
 ### Fixed
+- Fixed duplicate reminder notifications - reduced time window from 1 minute to 30 seconds to prevent double sending at :59 and :00
 - Fixed review mode not being respected - now ReviewHandler checks user's ReviewMode setting
 - Fixed JSONB serialization error for `List<TimeOnly>` (ReminderTimes) by enabling dynamic JSON on NpgsqlDataSource (Npgsql 8.0+ breaking change)
 - Fixed OpenRouter API URL - use full URL instead of relative path to avoid HttpClient BaseAddress path replacement issue

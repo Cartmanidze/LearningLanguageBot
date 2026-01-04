@@ -47,11 +47,11 @@ public class ReminderJob
             if (u.TodayDate == userToday && u.TodayReviewed >= u.DailyGoal)
                 return false;
 
-            // Check if current local time matches any reminder time (within 1 minute window)
+            // Check if current local time matches any reminder time (within 30 second window)
             return u.ReminderTimes.Any(rt =>
             {
                 var diff = Math.Abs((userCurrentTime.ToTimeSpan() - rt.ToTimeSpan()).TotalMinutes);
-                return diff < 1;
+                return diff < 0.5;
             });
         }).ToList();
     }
