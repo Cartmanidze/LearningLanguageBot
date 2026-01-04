@@ -11,7 +11,7 @@ public class TranslationService : ITranslationService
 
     private const string SystemPrompt = """
         Ты помощник для изучения языков.
-        Переводи слова/фразы и давай примеры использования на ЦЕЛЕВОМ языке.
+        Переводи слова/фразы и давай примеры использования.
         Отвечай ТОЛЬКО валидным JSON без markdown-разметки.
         """;
 
@@ -25,26 +25,28 @@ public class TranslationService : ITranslationService
         string text,
         string sourceLang,
         string targetLang,
+        string examplesLang,
         CancellationToken ct = default)
     {
         var sourceLangName = GetLanguageName(sourceLang);
         var targetLangName = GetLanguageName(targetLang);
+        var examplesLangName = GetLanguageName(examplesLang);
 
         var userPrompt = $"""
-            Переведи слово/фразу и дай 2-3 примера использования НА ЦЕЛЕВОМ ЯЗЫКЕ ({targetLangName}).
+            Переведи слово/фразу с {sourceLangName} на {targetLangName}.
+            Дай 2-3 примера использования СТРОГО на {examplesLangName}.
 
             Текст: "{text}"
-            Направление: {sourceLangName} → {targetLangName}
 
-            ВАЖНО: Примеры должны быть ТОЛЬКО на {targetLangName}!
+            КРИТИЧЕСКИ ВАЖНО: Примеры должны быть ТОЛЬКО на {examplesLangName}! Не на {sourceLangName}!
 
             Верни JSON в формате:
             {"{"}
-              "translation": "основной перевод",
+              "translation": "основной перевод на {targetLangName}",
               "alternatives": ["альтернатива1", "альтернатива2"],
               "examples": [
-                {"{"}"original": "пример на {targetLangName}"{"}"},
-                {"{"}"original": "ещё пример на {targetLangName}"{"}"}
+                {"{"}"original": "пример ТОЛЬКО на {examplesLangName}"{"}"},
+                {"{"}"original": "ещё пример ТОЛЬКО на {examplesLangName}"{"}"}
               ]
             {"}"}
             """;

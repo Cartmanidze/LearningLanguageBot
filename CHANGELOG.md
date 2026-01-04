@@ -7,6 +7,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ## [Unreleased]
 
 ### Changed
+- Reminders now send as long as there are due cards, regardless of daily goal completion
 - **BREAKING**: Migrated from 4-project layered architecture to single-project vertical feature slice architecture
   - Removed: LearningLanguageBot.Bot, LearningLanguageBot.Core, LearningLanguageBot.Infrastructure, LearningLanguageBot.Shared
   - New structure: single `LearningLanguageBot` project with Features (Onboarding, Cards, Review, Reminders, Webhook) and Infrastructure folders
@@ -48,6 +49,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Fixed
 - Fixed duplicate reminder notifications - reduced time window from 1 minute to 30 seconds to prevent double sending at :59 and :00
+- Fixed examples language - examples are now always in target language (the language user is learning), regardless of input language
 - Fixed review mode not being respected - now ReviewHandler checks user's ReviewMode setting
 - Fixed JSONB serialization error for `List<TimeOnly>` (ReminderTimes) by enabling dynamic JSON on NpgsqlDataSource (Npgsql 8.0+ breaking change)
 - Fixed OpenRouter API URL - use full URL instead of relative path to avoid HttpClient BaseAddress path replacement issue

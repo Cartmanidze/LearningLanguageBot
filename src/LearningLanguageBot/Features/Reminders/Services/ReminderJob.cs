@@ -20,7 +20,7 @@ public class ReminderJob
     {
         var utcNow = DateTime.UtcNow;
 
-        // Get users who haven't completed their daily goal
+        // Get active users
         var users = await _db.Users
             .Where(u => u.IsActive)
             .ToListAsync(ct);
@@ -43,11 +43,8 @@ public class ReminderJob
             var userToday = DateOnly.FromDateTime(userLocalTime);
             var userCurrentTime = TimeOnly.FromDateTime(userLocalTime);
 
-            // Skip if user already completed daily goal today (in their timezone)
-            if (u.TodayDate == userToday && u.TodayReviewed >= u.DailyGoal)
-                return false;
-
             // Check if current local time matches any reminder time (within 30 second window)
+            // Note: We don't skip users who completed daily goal - reminders come as long as there are due cards
             return u.ReminderTimes.Any(rt =>
             {
                 var diff = Math.Abs((userCurrentTime.ToTimeSpan() - rt.ToTimeSpan()).TotalMinutes);

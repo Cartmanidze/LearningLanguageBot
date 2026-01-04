@@ -8,5 +8,6 @@ public interface ITranslationService
         string text,
         string sourceLang,
         string targetLang,
+        string examplesLang,
         CancellationToken ct = default);
 }

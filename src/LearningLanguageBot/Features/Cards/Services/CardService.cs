@@ -29,10 +29,12 @@ public class CardService
         var isNativeInput = inputLang == user.NativeLanguage;
 
         // Get translation from LLM
+        // Examples are ALWAYS in target language (the language user is learning)
         var translation = await _translationService.TranslateAsync(
             text,
             inputLang,
             isNativeInput ? user.TargetLanguage : user.NativeLanguage,
+            user.TargetLanguage, // examples always in target language
             ct);
 
         // Card structure: Front = Native (Russian), Back = Target (English)
