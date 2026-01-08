@@ -263,6 +263,9 @@ public class ReviewHandler
 
     private async Task HandleWrongAnswerAsync(long chatId, Card card, ReviewSession session, long userId, UserState state, CancellationToken ct)
     {
+        // Show loading message
+        var loadingMsg = await _bot.SendMessage(chatId, "🔄 Генерирую подсказку для запоминания...", cancellationToken: ct);
+
         await _reviewService.ProcessReviewAsync(session.CurrentCardId, knew: false, ct);
         await _userService.IncrementTodayReviewedAsync(userId, ct);
         await _reviewService.UpdateStatsAfterReviewAsync(userId, knew: false, ct);
@@ -270,13 +273,15 @@ public class ReviewHandler
         session.DidNotKnowCount++;
         session.CurrentIndex++;
 
-        var text = $"✗ Неверно\n\n{card.Front} — {card.Back}";
-        if (card.Examples.Count > 0)
-        {
-            text += $"\n\n• {card.Examples[0].Original}";
-        }
+        // Generate memory hint
+        var hint = await _memoryHintService.GetOrGenerateHintAsync(card.Id, ct);
 
-        await _bot.SendMessage(chatId, text, cancellationToken: ct);
+        var text = $"✗ Неверно\n\n**{card.Front}** — {card.Back}\n\n{hint}";
+
+        await _bot.EditMessageText(chatId, loadingMsg.MessageId, text, parseMode: ParseMode.Markdown, cancellationToken: ct);
+
+        // Delay so user can read the hint
+        await Task.Delay(3000, ct);
 
         await AdvanceToNextCardAsync(chatId, null, state, ct);
     }

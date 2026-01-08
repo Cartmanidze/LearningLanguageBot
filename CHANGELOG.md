@@ -10,6 +10,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - "Don't Remember" button with memory hints for better word retention
   - Replaces "Skip" button in typing mode review
   - Shows etymology, usage context, simpler synonyms, and memory associations
+  - All hints displayed in BOTH languages (native + target) for better understanding
+  - Memory hints also shown on wrong answers, not just "Don't Remember"
   - Uses LLM to generate memorable hints for each word
   - Hints are cached in database for instant subsequent access
 
