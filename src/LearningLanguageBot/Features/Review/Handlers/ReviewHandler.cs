@@ -6,6 +6,7 @@ using LearningLanguageBot.Infrastructure.Database.Models;
 using LearningLanguageBot.Infrastructure.State;
 using Telegram.Bot;
 using Telegram.Bot.Types;
+using Telegram.Bot.Types.Enums;
 using Telegram.Bot.Types.ReplyMarkups;
 
 namespace LearningLanguageBot.Features.Review.Handlers;
@@ -17,19 +18,22 @@ public class ReviewHandler
     private readonly ReviewService _reviewService;
     private readonly UserService _userService;
     private readonly ConversationStateManager _stateManager;
+    private readonly MemoryHintService _memoryHintService;
 
     public ReviewHandler(
         ITelegramBotClient bot,
         CardService cardService,
         ReviewService reviewService,
         UserService userService,
-        ConversationStateManager stateManager)
+        ConversationStateManager stateManager,
+        MemoryHintService memoryHintService)
     {
         _bot = bot;
         _cardService = cardService;
         _reviewService = reviewService;
         _userService = userService;
         _stateManager = stateManager;
+        _memoryHintService = memoryHintService;
     }
 
     public async Task HandleLearnCommandAsync(Message message, CancellationToken ct)
@@ -141,9 +145,9 @@ public class ReviewHandler
             // Typing mode: wait for user input
             state.ActiveReview.WaitingForTypedAnswer = true;
 
-            var skipKeyboard = new InlineKeyboardMarkup(new[]
+            var dontRememberKeyboard = new InlineKeyboardMarkup(new[]
             {
-                new[] { InlineKeyboardButton.WithCallbackData("⏭ Пропустить", $"{CallbackData.ReviewSkipCard}{card.Id}") }
+                new[] { InlineKeyboardButton.WithCallbackData("🤔 Не помню", $"{CallbackData.ReviewDontRemember}{card.Id}") }
             });
 
             var msg = await _bot.SendMessage(
@@ -152,7 +156,7 @@ public class ReviewHandler
                 $"📖 Карточка 1/{cards.Count}\n\n" +
                 $"{card.Front}\n\n" +
                 "Напиши перевод:",
-                replyMarkup: skipKeyboard,
+                replyMarkup: dontRememberKeyboard,
                 cancellationToken: ct);
 
             state.ActiveReview.LastMessageId = msg.MessageId;
@@ -310,9 +314,9 @@ public class ReviewHandler
         {
             await ProcessTypingAnswerAsync(callback, state, knew: false, ct);
         }
-        else if (data.StartsWith(CallbackData.ReviewSkipCard))
+        else if (data.StartsWith(CallbackData.ReviewDontRemember))
         {
-            await SkipCardAsync(callback, state, ct);
+            await DontRememberCardAsync(callback, state, ct);
         }
 
         await _bot.AnswerCallbackQuery(callback.Id, cancellationToken: ct);
@@ -344,13 +348,22 @@ public class ReviewHandler
         await AdvanceToNextCardAsync(callback.Message.Chat.Id, null, state, ct);
     }
 
-    private async Task SkipCardAsync(CallbackQuery callback, UserState state, CancellationToken ct)
+    private async Task DontRememberCardAsync(CallbackQuery callback, UserState state, CancellationToken ct)
     {
         var userId = callback.From.Id;
         var session = state.ActiveReview!;
+        var cardId = session.CurrentCardId;
 
-        // Treat skip as "didn't know"
-        await _reviewService.ProcessReviewAsync(session.CurrentCardId, knew: false, ct);
+        // Show loading state
+        await _bot.EditMessageText(
+            callback.Message!.Chat.Id,
+            callback.Message.MessageId,
+            "🔄 Генерирую подсказку для запоминания...",
+            replyMarkup: null,
+            cancellationToken: ct);
+
+        // Treat as "didn't know"
+        await _reviewService.ProcessReviewAsync(cardId, knew: false, ct);
         await _userService.IncrementTodayReviewedAsync(userId, ct);
         await _reviewService.UpdateStatsAfterReviewAsync(userId, knew: false, ct);
 
@@ -358,18 +371,27 @@ public class ReviewHandler
         session.CurrentIndex++;
         session.WaitingForTypedAnswer = false;
 
-        var card = await _cardService.GetCardAsync(session.CardIds[session.CurrentIndex - 1], ct);
+        var card = await _cardService.GetCardAsync(cardId, ct);
         if (card != null)
         {
+            // Generate or get cached memory hint
+            var hint = await _memoryHintService.GetOrGenerateHintAsync(cardId, ct);
+
+            var text = $"🤔 Не помню\n\n**{card.Front}** — {card.Back}\n\n{hint}";
+
             await _bot.EditMessageText(
-                callback.Message!.Chat.Id,
+                callback.Message.Chat.Id,
                 callback.Message.MessageId,
-                $"⏭ Пропущено\n\n{card.Front} — {card.Back}",
+                text,
+                parseMode: ParseMode.Markdown,
                 replyMarkup: null,
                 cancellationToken: ct);
         }
 
-        await AdvanceToNextCardAsync(callback.Message!.Chat.Id, null, state, ct);
+        // Small delay so user can read the hint
+        await Task.Delay(3000, ct);
+
+        await AdvanceToNextCardAsync(callback.Message.Chat.Id, null, state, ct);
     }
 
     private async Task ShowCurrentCardAsync(long chatId, int? messageId, UserState state, ReviewMode reviewMode, CancellationToken ct)
@@ -388,21 +410,21 @@ public class ReviewHandler
             // Typing mode: ask for input
             session.WaitingForTypedAnswer = true;
 
-            var skipKeyboard = new InlineKeyboardMarkup(new[]
+            var dontRememberKeyboard = new InlineKeyboardMarkup(new[]
             {
-                new[] { InlineKeyboardButton.WithCallbackData("⏭ Пропустить", $"{CallbackData.ReviewSkipCard}{card.Id}") }
+                new[] { InlineKeyboardButton.WithCallbackData("🤔 Не помню", $"{CallbackData.ReviewDontRemember}{card.Id}") }
             });
 
             var text = $"📖 Карточка {session.CurrentIndex + 1}/{session.TotalCards}\n\n{card.Front}\n\nНапиши перевод:";
 
             if (messageId.HasValue)
             {
-                await _bot.EditMessageText(chatId, messageId.Value, text, replyMarkup: skipKeyboard, cancellationToken: ct);
+                await _bot.EditMessageText(chatId, messageId.Value, text, replyMarkup: dontRememberKeyboard, cancellationToken: ct);
                 session.LastMessageId = messageId.Value;
             }
             else
             {
-                var msg = await _bot.SendMessage(chatId, text, replyMarkup: skipKeyboard, cancellationToken: ct);
+                var msg = await _bot.SendMessage(chatId, text, replyMarkup: dontRememberKeyboard, cancellationToken: ct);
                 session.LastMessageId = msg.MessageId;
             }
         }

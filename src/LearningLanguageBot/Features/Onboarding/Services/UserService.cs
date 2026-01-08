@@ -15,7 +15,19 @@ public class UserService
 
     public async Task<User?> GetUserAsync(long telegramId, CancellationToken ct = default)
     {
-        return await _db.Users.FindAsync([telegramId], ct);
+        var user = await _db.Users.FindAsync([telegramId], ct);
+        if (user == null) return null;
+
+        // Reset daily counter if new day
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        if (user.TodayDate != today)
+        {
+            user.TodayDate = today;
+            user.TodayReviewed = 0;
+            await _db.SaveChangesAsync(ct);
+        }
+
+        return user;
     }
 
     public async Task<User> GetOrCreateUserAsync(long telegramId, CancellationToken ct = default)
@@ -77,12 +89,10 @@ public class UserService
 
     public async Task<(int reviewed, int goal)> GetTodayProgressAsync(long telegramId, CancellationToken ct = default)
     {
-        var user = await _db.Users.FindAsync([telegramId], ct);
+        var user = await GetUserAsync(telegramId, ct);
         if (user == null) return (0, 20);
 
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
-        var reviewed = user.TodayDate == today ? user.TodayReviewed : 0;
-        return (reviewed, user.DailyGoal);
+        return (user.TodayReviewed, user.DailyGoal);
     }
 
     public async Task<List<User>> GetUsersForReminderAsync(TimeOnly time, CancellationToken ct = default)

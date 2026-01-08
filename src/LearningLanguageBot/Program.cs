@@ -72,6 +72,7 @@ try
 
     // Features: Review
     builder.Services.AddScoped<ReviewService>();
+    builder.Services.AddScoped<MemoryHintService>();
     builder.Services.AddScoped<ReviewHandler>();
 
     // Features: Settings

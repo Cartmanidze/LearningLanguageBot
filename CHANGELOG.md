@@ -6,6 +6,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Added
+- "Don't Remember" button with memory hints for better word retention
+  - Replaces "Skip" button in typing mode review
+  - Shows etymology, usage context, simpler synonyms, and memory associations
+  - Uses LLM to generate memorable hints for each word
+  - Hints are cached in database for instant subsequent access
+
 ### Changed
 - Reminders now send as long as there are due cards, regardless of daily goal completion
 - **BREAKING**: Migrated from 4-project layered architecture to single-project vertical feature slice architecture
@@ -19,7 +26,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Implemented Typing review mode (F5) - user types translation instead of just revealing it
   - Fuzzy matching with Levenshtein distance for answer comparison
   - Three match results: Exact (auto-accept), Partial (user chooses), Wrong (auto-reject)
-  - Skip button to skip difficult cards
 - `AnswerMatcher` service for comparing user answers with correct translations
 - Custom reminder time selection during onboarding
   - Quick buttons: Morning (9:00), Day (14:00), Evening (20:00), All three
@@ -48,6 +54,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   - Log JSON parsing failures with partial content
 
 ### Fixed
+- Fixed review session not resetting card count on new day - `GetUserAsync` now automatically resets `TodayReviewed` when date changes
 - Fixed duplicate reminder notifications - reduced time window from 1 minute to 30 seconds to prevent double sending at :59 and :00
 - Fixed examples language - examples are now always in target language (the language user is learning), regardless of input language
 - Fixed review mode not being respected - now ReviewHandler checks user's ReviewMode setting

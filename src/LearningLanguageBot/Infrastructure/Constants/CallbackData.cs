@@ -27,7 +27,7 @@ public static class CallbackData
     public const string ReviewDidNotKnow = "review:didnotknow:";
     public const string ReviewCountAsKnew = "review:countas:knew:";      // Typing mode: count partial as correct
     public const string ReviewCountAsDidNotKnow = "review:countas:not:"; // Typing mode: count partial as wrong
-    public const string ReviewSkipCard = "review:skip:";                  // Skip current card
+    public const string ReviewDontRemember = "review:dontremember:";     // Show answer with memory hints
 
     // Learn
     public const string LearnStart = "learn:start";
