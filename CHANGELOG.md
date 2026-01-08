@@ -14,6 +14,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   - Memory hints also shown on wrong answers, not just "Don't Remember"
   - Uses LLM to generate memorable hints for each word
   - Hints are cached in database for instant subsequent access
+  - Visual association images from Unsplash API for better memorization
 
 ### Changed
 - Reminders now send as long as there are due cards, regardless of daily goal completion

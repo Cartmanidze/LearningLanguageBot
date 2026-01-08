@@ -73,6 +73,8 @@ try
     // Features: Review
     builder.Services.AddScoped<ReviewService>();
     builder.Services.AddScoped<MemoryHintService>();
+    builder.Services.Configure<UnsplashOptions>(builder.Configuration.GetSection(UnsplashOptions.SectionName));
+    builder.Services.AddHttpClient<UnsplashService>();
     builder.Services.AddScoped<ReviewHandler>();
 
     // Features: Settings

@@ -19,6 +19,7 @@ public class ReviewHandler
     private readonly UserService _userService;
     private readonly ConversationStateManager _stateManager;
     private readonly MemoryHintService _memoryHintService;
+    private readonly UnsplashService _unsplashService;
 
     public ReviewHandler(
         ITelegramBotClient bot,
@@ -26,7 +27,8 @@ public class ReviewHandler
         ReviewService reviewService,
         UserService userService,
         ConversationStateManager stateManager,
-        MemoryHintService memoryHintService)
+        MemoryHintService memoryHintService,
+        UnsplashService unsplashService)
     {
         _bot = bot;
         _cardService = cardService;
@@ -34,6 +36,7 @@ public class ReviewHandler
         _userService = userService;
         _stateManager = stateManager;
         _memoryHintService = memoryHintService;
+        _unsplashService = unsplashService;
     }
 
     public async Task HandleLearnCommandAsync(Message message, CancellationToken ct)
@@ -273,12 +276,27 @@ public class ReviewHandler
         session.DidNotKnowCount++;
         session.CurrentIndex++;
 
-        // Generate memory hint
-        var hint = await _memoryHintService.GetOrGenerateHintAsync(card.Id, ct);
+        // Generate memory hint and search for image in parallel
+        var hintTask = _memoryHintService.GetOrGenerateHintAsync(card.Id, ct);
+        var imageTask = _unsplashService.SearchImageAsync(card.Back, ct);
 
-        var text = $"✗ Неверно\n\n**{card.Front}** — {card.Back}\n\n{hint}";
+        var hint = await hintTask;
+        var imageUrl = await imageTask;
 
-        await _bot.EditMessageText(chatId, loadingMsg.MessageId, text, parseMode: ParseMode.Markdown, cancellationToken: ct);
+        var text = $"✗ Неверно\n\n*{card.Front}* — {card.Back}\n\n{hint}";
+
+        // Delete loading message
+        await _bot.DeleteMessage(chatId, loadingMsg.MessageId, cancellationToken: ct);
+
+        // Send image with caption if found, otherwise just text
+        if (!string.IsNullOrEmpty(imageUrl))
+        {
+            await _bot.SendPhoto(chatId, InputFile.FromUri(imageUrl), caption: text, parseMode: ParseMode.Markdown, cancellationToken: ct);
+        }
+        else
+        {
+            await _bot.SendMessage(chatId, text, parseMode: ParseMode.Markdown, cancellationToken: ct);
+        }
 
         // Delay so user can read the hint
         await Task.Delay(3000, ct);
@@ -358,10 +376,11 @@ public class ReviewHandler
         var userId = callback.From.Id;
         var session = state.ActiveReview!;
         var cardId = session.CurrentCardId;
+        var chatId = callback.Message!.Chat.Id;
 
         // Show loading state
         await _bot.EditMessageText(
-            callback.Message!.Chat.Id,
+            chatId,
             callback.Message.MessageId,
             "🔄 Генерирую подсказку для запоминания...",
             replyMarkup: null,
@@ -379,18 +398,27 @@ public class ReviewHandler
         var card = await _cardService.GetCardAsync(cardId, ct);
         if (card != null)
         {
-            // Generate or get cached memory hint
-            var hint = await _memoryHintService.GetOrGenerateHintAsync(cardId, ct);
+            // Generate memory hint and search for image in parallel
+            var hintTask = _memoryHintService.GetOrGenerateHintAsync(cardId, ct);
+            var imageTask = _unsplashService.SearchImageAsync(card.Back, ct);
 
-            var text = $"🤔 Не помню\n\n**{card.Front}** — {card.Back}\n\n{hint}";
+            var hint = await hintTask;
+            var imageUrl = await imageTask;
 
-            await _bot.EditMessageText(
-                callback.Message.Chat.Id,
-                callback.Message.MessageId,
-                text,
-                parseMode: ParseMode.Markdown,
-                replyMarkup: null,
-                cancellationToken: ct);
+            var text = $"🤔 Не помню\n\n*{card.Front}* — {card.Back}\n\n{hint}";
+
+            // Delete loading message
+            await _bot.DeleteMessage(chatId, callback.Message.MessageId, cancellationToken: ct);
+
+            // Send image with caption if found, otherwise just text
+            if (!string.IsNullOrEmpty(imageUrl))
+            {
+                await _bot.SendPhoto(chatId, InputFile.FromUri(imageUrl), caption: text, parseMode: ParseMode.Markdown, cancellationToken: ct);
+            }
+            else
+            {
+                await _bot.SendMessage(chatId, text, parseMode: ParseMode.Markdown, cancellationToken: ct);
+            }
         }
 
         // Small delay so user can read the hint
