@@ -88,7 +88,7 @@ public partial class MemoryHintService
             - {targetLangName}: мнемоника или образ для запоминания
             - {sourceLangName}: перевод ассоциации
 
-            🖼️ **Image**: одно-два английских слова для поиска картинки, которая поможет запомнить это слово (конкретный образ, не абстрактный). Например для "intervene" → "handshake mediation", для "cruel" → "evil villain"
+            🖼️ **Image**: ТОЛЬКО 1-2 простых английских слова для поиска фото (существительные). Например: "intervene" → "handshake", "cruel" → "villain", "assume" → "thinking person". НЕ используй кавычки и сложные фразы!
             """;
 
         try
@@ -111,10 +111,15 @@ public partial class MemoryHintService
         if (!match.Success)
             return (rawHint, null);
 
-        var imageKeyword = match.Groups[1].Value.Trim();
+        // Clean up keyword: remove quotes, asterisks, extra spaces
+        var imageKeyword = match.Groups[1].Value
+            .Trim()
+            .Trim('"', '\'', '*', '`')
+            .Trim();
+
         var cleanHint = rawHint.Replace(match.Value, "").Trim();
 
-        return (cleanHint, imageKeyword);
+        return (cleanHint, string.IsNullOrEmpty(imageKeyword) ? null : imageKeyword);
     }
 
     [GeneratedRegex(@"🖼️\s*\*{0,2}Image\*{0,2}:\s*(.+?)(?:\n|$)", RegexOptions.IgnoreCase)]
