@@ -276,26 +276,22 @@ public class ReviewHandler
         session.DidNotKnowCount++;
         session.CurrentIndex++;
 
-        // Generate memory hint and search for image in parallel
-        var hintTask = _memoryHintService.GetOrGenerateHintAsync(card.Id, ct);
-        var imageTask = _unsplashService.SearchImageAsync(card.Back, ct);
+        // Generate memory hint first, then search for image using LLM-generated keyword
+        var hintResult = await _memoryHintService.GetOrGenerateHintAsync(card.Id, ct);
+        var imageKeyword = hintResult.ImageKeyword ?? card.Back;
+        var imageUrl = await _unsplashService.SearchImageAsync(imageKeyword, ct);
 
-        var hint = await hintTask;
-        var imageUrl = await imageTask;
-
-        var text = $"✗ Неверно\n\n*{card.Front}* — {card.Back}\n\n{hint}";
+        var text = $"✗ Неверно\n\n*{card.Front}* — {card.Back}\n\n{hintResult.Hint}";
 
         // Delete loading message
         await _bot.DeleteMessage(chatId, loadingMsg.MessageId, cancellationToken: ct);
 
-        // Send image with caption if found, otherwise just text
+        // Send text first, then image
+        await _bot.SendMessage(chatId, text, parseMode: ParseMode.Markdown, cancellationToken: ct);
+
         if (!string.IsNullOrEmpty(imageUrl))
         {
-            await _bot.SendPhoto(chatId, InputFile.FromUri(imageUrl), caption: text, parseMode: ParseMode.Markdown, cancellationToken: ct);
-        }
-        else
-        {
-            await _bot.SendMessage(chatId, text, parseMode: ParseMode.Markdown, cancellationToken: ct);
+            await _bot.SendPhoto(chatId, InputFile.FromUri(imageUrl), cancellationToken: ct);
         }
 
         // Delay so user can read the hint
@@ -398,26 +394,22 @@ public class ReviewHandler
         var card = await _cardService.GetCardAsync(cardId, ct);
         if (card != null)
         {
-            // Generate memory hint and search for image in parallel
-            var hintTask = _memoryHintService.GetOrGenerateHintAsync(cardId, ct);
-            var imageTask = _unsplashService.SearchImageAsync(card.Back, ct);
+            // Generate memory hint first, then search for image using LLM-generated keyword
+            var hintResult = await _memoryHintService.GetOrGenerateHintAsync(cardId, ct);
+            var imageKeyword = hintResult.ImageKeyword ?? card.Back;
+            var imageUrl = await _unsplashService.SearchImageAsync(imageKeyword, ct);
 
-            var hint = await hintTask;
-            var imageUrl = await imageTask;
-
-            var text = $"🤔 Не помню\n\n*{card.Front}* — {card.Back}\n\n{hint}";
+            var text = $"🤔 Не помню\n\n*{card.Front}* — {card.Back}\n\n{hintResult.Hint}";
 
             // Delete loading message
             await _bot.DeleteMessage(chatId, callback.Message.MessageId, cancellationToken: ct);
 
-            // Send image with caption if found, otherwise just text
+            // Send text first, then image
+            await _bot.SendMessage(chatId, text, parseMode: ParseMode.Markdown, cancellationToken: ct);
+
             if (!string.IsNullOrEmpty(imageUrl))
             {
-                await _bot.SendPhoto(chatId, InputFile.FromUri(imageUrl), caption: text, parseMode: ParseMode.Markdown, cancellationToken: ct);
-            }
-            else
-            {
-                await _bot.SendMessage(chatId, text, parseMode: ParseMode.Markdown, cancellationToken: ct);
+                await _bot.SendPhoto(chatId, InputFile.FromUri(imageUrl), cancellationToken: ct);
             }
         }
 

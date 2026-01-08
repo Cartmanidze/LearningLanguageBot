@@ -1,3 +1,4 @@
+using System.Text.RegularExpressions;
 using LearningLanguageBot.Features.Cards.Services;
 using LearningLanguageBot.Infrastructure.Database;
 using Microsoft.EntityFrameworkCore;
@@ -5,7 +6,9 @@ using Microsoft.Extensions.Logging;
 
 namespace LearningLanguageBot.Features.Review.Services;
 
-public class MemoryHintService
+public record MemoryHintResult(string Hint, string? ImageKeyword);
+
+public partial class MemoryHintService
 {
     private readonly OpenRouterClient _client;
     private readonly AppDbContext _db;
@@ -29,24 +32,28 @@ public class MemoryHintService
     /// <summary>
     /// Gets or generates a memory hint for the card.
     /// </summary>
-    public async Task<string> GetOrGenerateHintAsync(Guid cardId, CancellationToken ct = default)
+    public async Task<MemoryHintResult> GetOrGenerateHintAsync(Guid cardId, CancellationToken ct = default)
     {
         var card = await _db.Cards.FirstOrDefaultAsync(c => c.Id == cardId, ct);
         if (card == null)
-            return string.Empty;
+            return new MemoryHintResult(string.Empty, null);
 
         // Return cached hint if available
         if (!string.IsNullOrEmpty(card.MemoryHint))
-            return card.MemoryHint;
+        {
+            var (cachedHint, cachedKeyword) = ExtractImageKeyword(card.MemoryHint);
+            return new MemoryHintResult(cachedHint, cachedKeyword);
+        }
 
         // Generate new hint
-        var hint = await GenerateHintAsync(card.Front, card.Back, card.SourceLang, card.TargetLang, ct);
+        var rawHint = await GenerateHintAsync(card.Front, card.Back, card.SourceLang, card.TargetLang, ct);
 
-        // Cache in database
-        card.MemoryHint = hint;
+        // Cache in database (with image keyword included)
+        card.MemoryHint = rawHint;
         await _db.SaveChangesAsync(ct);
 
-        return hint;
+        var (hint, imageKeyword) = ExtractImageKeyword(rawHint);
+        return new MemoryHintResult(hint, imageKeyword);
     }
 
     private async Task<string> GenerateHintAsync(
@@ -80,6 +87,8 @@ public class MemoryHintService
             🧠 **Ассоциация / Mnemonic**:
             - {targetLangName}: мнемоника или образ для запоминания
             - {sourceLangName}: перевод ассоциации
+
+            🖼️ **Image**: одно-два английских слова для поиска картинки, которая поможет запомнить это слово (конкретный образ, не абстрактный). Например для "intervene" → "handshake mediation", для "cruel" → "evil villain"
             """;
 
         try
@@ -92,6 +101,24 @@ public class MemoryHintService
             return "Не удалось загрузить подсказку";
         }
     }
+
+    /// <summary>
+    /// Extracts image keyword from hint and returns cleaned hint.
+    /// </summary>
+    private static (string hint, string? imageKeyword) ExtractImageKeyword(string rawHint)
+    {
+        var match = ImageKeywordRegex().Match(rawHint);
+        if (!match.Success)
+            return (rawHint, null);
+
+        var imageKeyword = match.Groups[1].Value.Trim();
+        var cleanHint = rawHint.Replace(match.Value, "").Trim();
+
+        return (cleanHint, imageKeyword);
+    }
+
+    [GeneratedRegex(@"🖼️\s*\*{0,2}Image\*{0,2}:\s*(.+?)(?:\n|$)", RegexOptions.IgnoreCase)]
+    private static partial Regex ImageKeywordRegex();
 
     private static string GetLanguageName(string code) => code switch
     {

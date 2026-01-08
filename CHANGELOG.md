@@ -15,6 +15,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   - Uses LLM to generate memorable hints for each word
   - Hints are cached in database for instant subsequent access
   - Visual association images from Unsplash API for better memorization
+  - LLM generates specific image search keywords (e.g., "intervene" → "handshake mediation")
 
 ### Changed
 - Reminders now send as long as there are due cards, regardless of daily goal completion

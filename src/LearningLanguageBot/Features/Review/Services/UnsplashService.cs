@@ -37,6 +37,8 @@ public class UnsplashService
 
         try
         {
+            _logger.LogInformation("Searching Unsplash for: {Keyword}", keyword);
+
             var response = await _httpClient.GetFromJsonAsync<UnsplashSearchResponse>(
                 $"search/photos?query={Uri.EscapeDataString(keyword)}&per_page=1&orientation=squarish",
                 ct);
@@ -44,9 +46,11 @@ public class UnsplashService
             var photo = response?.Results?.FirstOrDefault();
             if (photo == null)
             {
-                _logger.LogDebug("No image found for keyword: {Keyword}", keyword);
+                _logger.LogInformation("No image found for keyword: {Keyword}", keyword);
                 return null;
             }
+
+            _logger.LogInformation("Found image for {Keyword}: {AltDescription}", keyword, photo.AltDescription);
 
             // Use small size for Telegram (400px)
             return photo.Urls?.Small;
