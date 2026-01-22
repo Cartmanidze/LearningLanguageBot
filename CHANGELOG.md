@@ -6,16 +6,24 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Changed
+- Improved memory hints with phonetic anchor technique
+  - New 3-section format: "Sounds like" → "Imagine" → "Remember"
+  - Phonetic associations based on similar sounds in native language
+  - Vivid, absurd, or emotional imagery for better retention
+  - Example: "serendipity" ≈ "СЭР + ИНДИЯ + ТИПА" → "Сэр в Индии типа нашёл клад"
+
+### Removed
+- Unsplash image integration (removed UnsplashService)
+  - Images were not effective for memorization
+  - Text-based phonetic associations work better
+
 ### Added
 - "Don't Remember" button with memory hints for better word retention
   - Replaces "Skip" button in typing mode review
-  - Shows etymology, usage context, simpler synonyms, and memory associations
-  - All hints displayed in BOTH languages (native + target) for better understanding
   - Memory hints also shown on wrong answers, not just "Don't Remember"
   - Uses LLM to generate memorable hints for each word
   - Hints are cached in database for instant subsequent access
-  - Visual association images from Unsplash API for better memorization
-  - LLM generates specific image search keywords (e.g., "intervene" → "handshake mediation")
 
 ### Changed
 - Reminders now send as long as there are due cards, regardless of daily goal completion

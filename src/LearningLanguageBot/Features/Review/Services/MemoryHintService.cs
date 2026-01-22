@@ -1,4 +1,3 @@
-using System.Text.RegularExpressions;
 using LearningLanguageBot.Features.Cards.Services;
 using LearningLanguageBot.Infrastructure.Database;
 using Microsoft.EntityFrameworkCore;
@@ -6,17 +5,16 @@ using Microsoft.Extensions.Logging;
 
 namespace LearningLanguageBot.Features.Review.Services;
 
-public record MemoryHintResult(string Hint, string? ImageKeyword);
-
-public partial class MemoryHintService
+public class MemoryHintService
 {
     private readonly OpenRouterClient _client;
     private readonly AppDbContext _db;
     private readonly ILogger<MemoryHintService> _logger;
 
     private const string SystemPrompt = """
-        Ты помощник для изучения языков. Помоги запомнить слово.
-        Отвечай кратко и по делу. Используй emoji для структуры.
+        Ты помощник для изучения языков. Помоги запомнить слово через фонетическую ассоциацию.
+        Создавай ЯРКИЕ, СМЕШНЫЕ или АБСУРДНЫЕ образы — такое запоминается лучше.
+        Отвечай кратко и по делу.
         """;
 
     public MemoryHintService(
@@ -32,28 +30,24 @@ public partial class MemoryHintService
     /// <summary>
     /// Gets or generates a memory hint for the card.
     /// </summary>
-    public async Task<MemoryHintResult> GetOrGenerateHintAsync(Guid cardId, CancellationToken ct = default)
+    public async Task<string> GetOrGenerateHintAsync(Guid cardId, CancellationToken ct = default)
     {
         var card = await _db.Cards.FirstOrDefaultAsync(c => c.Id == cardId, ct);
         if (card == null)
-            return new MemoryHintResult(string.Empty, null);
+            return string.Empty;
 
         // Return cached hint if available
         if (!string.IsNullOrEmpty(card.MemoryHint))
-        {
-            var (cachedHint, cachedKeyword) = ExtractImageKeyword(card.MemoryHint);
-            return new MemoryHintResult(cachedHint, cachedKeyword);
-        }
+            return card.MemoryHint;
 
         // Generate new hint
-        var rawHint = await GenerateHintAsync(card.Front, card.Back, card.SourceLang, card.TargetLang, ct);
+        var hint = await GenerateHintAsync(card.Front, card.Back, card.SourceLang, card.TargetLang, ct);
 
-        // Cache in database (with image keyword included)
-        card.MemoryHint = rawHint;
+        // Cache in database
+        card.MemoryHint = hint;
         await _db.SaveChangesAsync(ct);
 
-        var (hint, imageKeyword) = ExtractImageKeyword(rawHint);
-        return new MemoryHintResult(hint, imageKeyword);
+        return hint;
     }
 
     private async Task<string> GenerateHintAsync(
@@ -70,25 +64,19 @@ public partial class MemoryHintService
             Слово: "{translation}" ({targetLangName})
             Перевод: "{word}" ({sourceLangName})
 
-            Напиши КРАТКО (каждый пункт 1-2 предложения) на ОБОИХ языках:
+            🔊 **Звучит как / Sounds like**:
+            Найди созвучие на {sourceLangName}: "{translation}" ≈ [похожие слова/слоги]
+            Разбей на части если нужно: "se-ren-di-pi-ty" → "сэр" + "Индия" + "типа"
 
-            📚 **Этимология / Etymology**:
-            - {targetLangName}: откуда произошло слово "{translation}"
-            - {sourceLangName}: перевод этимологии
+            🎬 **Представь / Imagine**:
+            Опиши ЯРКУЮ сцену (2-3 предложения), которая связывает:
+            - созвучие с {sourceLangName}
+            - значение "{word}"
+            Сделай её смешной, абсурдной или эмоциональной!
 
-            💬 **Использование / Usage**:
-            - {targetLangName}: в каких ситуациях употребляется (формальное/неформальное)
-            - {sourceLangName}: перевод
-
-            🔄 **Синоним попроще / Simpler synonym**:
-            - {targetLangName}: более простое/разговорное слово с тем же значением
-            - {sourceLangName}: его перевод
-
-            🧠 **Ассоциация / Mnemonic**:
-            - {targetLangName}: мнемоника или образ для запоминания
-            - {sourceLangName}: перевод ассоциации
-
-            🖼️ **Image**: ТОЛЬКО 1-2 простых английских слова для поиска фото (существительные). Например: "intervene" → "handshake", "cruel" → "villain", "assume" → "thinking person". НЕ используй кавычки и сложные фразы!
+            📝 **Запомни / Remember**:
+            Одна формула-связка (5-10 слов):
+            "[созвучие] → [образ] → {word}"
             """;
 
         try
@@ -101,29 +89,6 @@ public partial class MemoryHintService
             return "Не удалось загрузить подсказку";
         }
     }
-
-    /// <summary>
-    /// Extracts image keyword from hint and returns cleaned hint.
-    /// </summary>
-    private static (string hint, string? imageKeyword) ExtractImageKeyword(string rawHint)
-    {
-        var match = ImageKeywordRegex().Match(rawHint);
-        if (!match.Success)
-            return (rawHint, null);
-
-        // Clean up keyword: remove quotes, asterisks, extra spaces
-        var imageKeyword = match.Groups[1].Value
-            .Trim()
-            .Trim('"', '\'', '*', '`')
-            .Trim();
-
-        var cleanHint = rawHint.Replace(match.Value, "").Trim();
-
-        return (cleanHint, string.IsNullOrEmpty(imageKeyword) ? null : imageKeyword);
-    }
-
-    [GeneratedRegex(@"🖼️\s*\*{0,2}Image\*{0,2}:\s*(.+?)(?:\n|$)", RegexOptions.IgnoreCase)]
-    private static partial Regex ImageKeywordRegex();
 
     private static string GetLanguageName(string code) => code switch
     {
