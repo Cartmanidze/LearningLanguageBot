@@ -80,14 +80,18 @@ public class FsrsService
             _ => State.Learning
         };
 
+        // For new cards (State=0), FSRS expects specific initial values
+        // For reviewed cards, use stored values
+        var isNew = card.State == 0;
+
         return new Card(
             cardId: null,
             state: fsrsState,
-            step: card.State == 0 ? 0 : null,  // New cards start at step 0
-            stability: card.Stability > 0 ? card.Stability : null,
-            difficulty: card.Difficulty > 0 ? card.Difficulty : null,
+            step: isNew ? 0 : null,
+            stability: isNew ? null : (card.Stability > 0 ? card.Stability : 1.0),
+            difficulty: isNew ? null : (card.Difficulty > 0 ? card.Difficulty : 0.3),
             due: card.NextReviewAt,
-            lastReview: card.LastReview ?? DateTime.UtcNow  // FSRS requires lastReview, use now for new cards
+            lastReview: isNew ? null : (card.LastReview ?? DateTime.UtcNow)
         );
     }
 
