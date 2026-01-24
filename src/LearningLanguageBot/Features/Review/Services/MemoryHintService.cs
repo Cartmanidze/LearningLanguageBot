@@ -12,9 +12,8 @@ public class MemoryHintService
     private readonly ILogger<MemoryHintService> _logger;
 
     private const string SystemPrompt = """
-        Ты помощник для изучения языков. Помоги запомнить слово через фонетическую ассоциацию.
-        Создавай ЯРКИЕ, СМЕШНЫЕ или АБСУРДНЫЕ образы — такое запоминается лучше.
-        Отвечай кратко и по делу.
+        Создай мнемоническую подсказку для запоминания слова. Будь КРАТКИМ (3-4 строки максимум).
+        Формат: созвучие → яркий образ → значение.
         """;
 
     public MemoryHintService(
@@ -34,11 +33,19 @@ public class MemoryHintService
     {
         var card = await _db.Cards.FirstOrDefaultAsync(c => c.Id == cardId, ct);
         if (card == null)
+        {
+            _logger.LogWarning("Card not found: {CardId}", cardId);
             return string.Empty;
+        }
 
         // Return cached hint if available
         if (!string.IsNullOrEmpty(card.MemoryHint))
+        {
+            _logger.LogInformation("Returning cached hint for {Word}, length={Length}", card.Back, card.MemoryHint.Length);
             return card.MemoryHint;
+        }
+
+        _logger.LogInformation("Generating new hint for {Word} (MemoryHint was null/empty)", card.Back);
 
         // Generate new hint
         var hint = await GenerateHintAsync(card.Front, card.Back, card.SourceLang, card.TargetLang, ct);
@@ -46,6 +53,8 @@ public class MemoryHintService
         // Cache in database
         card.MemoryHint = hint;
         await _db.SaveChangesAsync(ct);
+
+        _logger.LogInformation("Saved hint for {Word}, length={Length}", card.Back, hint.Length);
 
         return hint;
     }
@@ -61,27 +70,17 @@ public class MemoryHintService
         var targetLangName = GetLanguageName(targetLang);
 
         var userPrompt = $"""
-            Слово: "{translation}" ({targetLangName})
-            Перевод: "{word}" ({sourceLangName})
+            "{translation}" = "{word}"
 
-            🔊 **Звучит как / Sounds like**:
-            Найди созвучие на {sourceLangName}: "{translation}" ≈ [похожие слова/слоги]
-            Разбей на части если нужно: "se-ren-di-pi-ty" → "сэр" + "Индия" + "типа"
-
-            🎬 **Представь / Imagine**:
-            Опиши ЯРКУЮ сцену (2-3 предложения), которая связывает:
-            - созвучие с {sourceLangName}
-            - значение "{word}"
-            Сделай её смешной, абсурдной или эмоциональной!
-
-            📝 **Запомни / Remember**:
-            Одна формула-связка (5-10 слов):
-            "[созвучие] → [образ] → {word}"
+            🔊 Созвучие: "{translation}" ≈ [слова на {sourceLangName}]
+            🎬 Образ: [1 яркое предложение]
+            📝 Формула: [созвучие] → [образ] → {word}
             """;
 
         try
         {
-            return await _client.ChatAsync(SystemPrompt, userPrompt, ct);
+            // Use smaller token limit for concise hints
+            return await _client.ChatAsync(SystemPrompt, userPrompt, maxTokens: 200, ct);
         }
         catch (Exception ex)
         {

@@ -20,6 +20,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   - "Don't Remember" button now immediately answers callback before LLM generation
   - Prevents "query is too old and response timeout expired" errors
 
+### Improved
+- Optimized memory hint generation speed
+  - Reduced MaxTokens from 1000 to 200 for faster LLM response
+  - Simplified prompt for more concise hints (3-4 lines instead of detailed format)
+  - Added detailed timing logs (headers vs total time) for debugging
+
 ### Changed
 - Improved memory hints with phonetic anchor technique
   - New 3-section format: "Sounds like" → "Imagine" → "Remember"

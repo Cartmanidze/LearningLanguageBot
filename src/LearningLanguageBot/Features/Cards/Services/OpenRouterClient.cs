@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Net.Http.Json;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -32,6 +33,9 @@ public class OpenRouterClient
     }
 
     public async Task<string> ChatAsync(string systemPrompt, string userPrompt, CancellationToken ct = default)
+        => await ChatAsync(systemPrompt, userPrompt, maxTokens: null, ct);
+
+    public async Task<string> ChatAsync(string systemPrompt, string userPrompt, int? maxTokens, CancellationToken ct = default)
     {
         var request = new ChatRequest
         {
@@ -41,21 +45,38 @@ public class OpenRouterClient
                 new() { Role = "system", Content = systemPrompt },
                 new() { Role = "user", Content = userPrompt }
             ],
-            MaxTokens = _options.MaxTokens,
+            MaxTokens = maxTokens ?? _options.MaxTokens,
             Temperature = _options.Temperature
         };
 
+        var sw = Stopwatch.StartNew();
+
         try
         {
-            var response = await _httpClient.PostAsJsonAsync($"{_options.BaseUrl}/chat/completions", request, JsonOptions, ct);
+            // Use ResponseHeadersRead for earlier access to response stream
+            using var httpRequest = new HttpRequestMessage(HttpMethod.Post, $"{_options.BaseUrl}/chat/completions")
+            {
+                Content = JsonContent.Create(request, options: JsonOptions)
+            };
+
+            using var response = await _httpClient.SendAsync(httpRequest, HttpCompletionOption.ResponseHeadersRead, ct);
             response.EnsureSuccessStatusCode();
 
+            var headersTime = sw.ElapsedMilliseconds;
+
+            // Read and deserialize response body (this is where LLM streaming happens)
             var result = await response.Content.ReadFromJsonAsync<ChatResponse>(JsonOptions, ct);
-            return result?.Choices?.FirstOrDefault()?.Message?.Content ?? string.Empty;
+            var content = result?.Choices?.FirstOrDefault()?.Message?.Content ?? string.Empty;
+
+            _logger.LogInformation(
+                "LLM response: headers={HeadersMs}ms, total={TotalMs}ms, length={Length}chars",
+                headersTime, sw.ElapsedMilliseconds, content.Length);
+
+            return content;
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "OpenRouter API call failed");
+            _logger.LogError(ex, "OpenRouter API call failed after {ElapsedMs}ms", sw.ElapsedMilliseconds);
             throw;
         }
     }
