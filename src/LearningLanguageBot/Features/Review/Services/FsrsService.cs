@@ -87,7 +87,7 @@ public class FsrsService
             stability: card.Stability > 0 ? card.Stability : null,
             difficulty: card.Difficulty > 0 ? card.Difficulty : null,
             due: card.NextReviewAt,
-            lastReview: card.LastReview
+            lastReview: card.LastReview ?? DateTime.UtcNow  // FSRS requires lastReview, use now for new cards
         );
     }
 

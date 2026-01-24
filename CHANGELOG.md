@@ -19,6 +19,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Fixed Telegram callback timeout error when generating memory hints
   - "Don't Remember" button now immediately answers callback before LLM generation
   - Prevents "query is too old and response timeout expired" errors
+- Fixed FSRS crash on new cards with null LastReview
+  - "Nullable object must have a value" error when reviewing new cards
+  - Now defaults to current time for cards without LastReview
 
 ### Improved
 - Optimized memory hint generation speed
