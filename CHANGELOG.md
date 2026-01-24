@@ -15,6 +15,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   - Database migration automatically converts existing SM-2 cards to FSRS format
   - Uses FSRS.Core NuGet package with dependency injection support
 
+### Fixed
+- Fixed Telegram callback timeout error when generating memory hints
+  - "Don't Remember" button now immediately answers callback before LLM generation
+  - Prevents "query is too old and response timeout expired" errors
+
 ### Changed
 - Improved memory hints with phonetic anchor technique
   - New 3-section format: "Sounds like" → "Imagine" → "Remember"

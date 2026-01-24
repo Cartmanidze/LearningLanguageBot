@@ -395,6 +395,9 @@ public class ReviewHandler
         var cardId = session.CurrentCardId;
         var chatId = callback.Message!.Chat.Id;
 
+        // Answer callback IMMEDIATELY to prevent Telegram timeout (hint generation is slow)
+        await _bot.AnswerCallbackQuery(callback.Id, cancellationToken: ct);
+
         // Show loading state
         await _bot.EditMessageText(
             chatId,
