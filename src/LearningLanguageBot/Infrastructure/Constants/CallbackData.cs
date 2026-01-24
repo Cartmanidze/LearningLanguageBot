@@ -21,12 +21,14 @@ public static class CallbackData
     public const string CardDeleteConfirm = "carddelconfirm:";
     public const string CardDeleteCancel = "carddelcancel:";
 
-    // Review actions
+    // Review actions (FSRS ratings)
     public const string ReviewReveal = "review:reveal:";
-    public const string ReviewKnew = "review:knew:";
-    public const string ReviewDidNotKnow = "review:didnotknow:";
-    public const string ReviewCountAsKnew = "review:countas:knew:";      // Typing mode: count partial as correct
-    public const string ReviewCountAsDidNotKnow = "review:countas:not:"; // Typing mode: count partial as wrong
+    public const string ReviewAgain = "review:again:";   // Rating.Again - не вспомнил
+    public const string ReviewHard = "review:hard:";     // Rating.Hard - с трудом
+    public const string ReviewGood = "review:good:";     // Rating.Good - нормально
+    public const string ReviewEasy = "review:easy:";     // Rating.Easy - легко
+    public const string ReviewCountAsGood = "review:countas:good:";      // Typing mode: count partial as correct
+    public const string ReviewCountAsAgain = "review:countas:again:";    // Typing mode: count partial as wrong
     public const string ReviewDontRemember = "review:dontremember:";     // Show answer with memory hints
 
     // Learn

@@ -7,6 +7,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ## [Unreleased]
 
 ### Changed
+- **BREAKING**: Replaced SM-2 algorithm with FSRS (Free Spaced Repetition Scheduler)
+  - FSRS is 20-30% more efficient at the same retention level
+  - 4 rating options instead of binary (Again/Hard/Good/Easy)
+  - Review buttons now show predicted intervals (e.g., "👍 Хорошо (1д)")
+  - Automatic rating in Typing mode based on response time and accuracy
+  - Database migration automatically converts existing SM-2 cards to FSRS format
+  - Uses FSRS.Core NuGet package with dependency injection support
+
+### Changed
 - Improved memory hints with phonetic anchor technique
   - New 3-section format: "Sounds like" → "Imagine" → "Remember"
   - Phonetic associations based on similar sounds in native language

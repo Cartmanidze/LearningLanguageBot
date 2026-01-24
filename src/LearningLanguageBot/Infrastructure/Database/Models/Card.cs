@@ -10,12 +10,15 @@ public class Card
     public string SourceLang { get; set; } = string.Empty;
     public string TargetLang { get; set; } = string.Empty;
 
-    // SRS parameters
-    public int Repetitions { get; set; }
-    public double EaseFactor { get; set; } = 2.5;
-    public int IntervalDays { get; set; }
+    // FSRS parameters
+    public double Stability { get; set; }
+    public double Difficulty { get; set; } = 0.3;
+    public int State { get; set; }          // New=0, Learning=1, Review=2, Relearning=3
+    public int Lapses { get; set; }
+    public int Reps { get; set; }
+    public DateTime? LastReview { get; set; }
     public DateTime NextReviewAt { get; set; } = DateTime.UtcNow;
-    public bool IsLearned { get; set; }
+    public bool IsLearned { get; set; }     // Для статистики (Stability >= 21 дней)
 
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 

@@ -89,6 +89,7 @@ public class ReviewSession
     public bool ShowingAnswer { get; set; }
     public bool WaitingForTypedAnswer { get; set; }
     public int? LastMessageId { get; set; }
+    public DateTime? AnswerStartTime { get; set; }  // For FSRS auto-rating based on response time
 
     public Guid CurrentCardId => CardIds.ElementAtOrDefault(CurrentIndex);
     public bool IsComplete => CurrentIndex >= CardIds.Count;

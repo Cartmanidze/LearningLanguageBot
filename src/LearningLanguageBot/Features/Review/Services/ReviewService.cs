@@ -1,3 +1,4 @@
+using FSRS.Core.Enums;
 using LearningLanguageBot.Infrastructure.Database;
 using LearningLanguageBot.Infrastructure.Database.Models;
 using Microsoft.EntityFrameworkCore;
@@ -7,27 +8,44 @@ namespace LearningLanguageBot.Features.Review.Services;
 public class ReviewService
 {
     private readonly AppDbContext _db;
+    private readonly FsrsService _fsrsService;
 
-    public ReviewService(AppDbContext db)
+    public ReviewService(AppDbContext db, FsrsService fsrsService)
     {
         _db = db;
+        _fsrsService = fsrsService;
     }
 
-    public async Task ProcessReviewAsync(Guid cardId, bool knew, CancellationToken ct = default)
+    /// <summary>
+    /// Process a card review with FSRS rating.
+    /// </summary>
+    public async Task ProcessReviewAsync(Guid cardId, Rating rating, CancellationToken ct = default)
     {
         var card = await _db.Cards.FindAsync([cardId], ct);
         if (card == null) return;
 
-        SrsEngine.ProcessReview(card, knew);
+        _fsrsService.ProcessReview(card, rating);
 
         var log = new ReviewLog
         {
             CardId = cardId,
-            Knew = knew
+            Rating = (int)rating
         };
 
         _db.ReviewLogs.Add(log);
         await _db.SaveChangesAsync(ct);
+    }
+
+    /// <summary>
+    /// Get preview of next intervals for all ratings (for UI).
+    /// </summary>
+    public async Task<Dictionary<Rating, TimeSpan>> GetNextIntervalsAsync(Guid cardId, CancellationToken ct = default)
+    {
+        var card = await _db.Cards.FindAsync([cardId], ct);
+        if (card == null)
+            return new Dictionary<Rating, TimeSpan>();
+
+        return _fsrsService.GetNextIntervals(card);
     }
 
     public async Task<UserStats?> GetUserStatsAsync(long userId, CancellationToken ct = default)
@@ -35,7 +53,7 @@ public class ReviewService
         return await _db.UserStats.FindAsync([userId], ct);
     }
 
-    public async Task UpdateStatsAfterReviewAsync(long userId, bool knew, CancellationToken ct = default)
+    public async Task UpdateStatsAfterReviewAsync(long userId, CancellationToken ct = default)
     {
         var stats = await _db.UserStats.FindAsync([userId], ct);
         if (stats == null) return;

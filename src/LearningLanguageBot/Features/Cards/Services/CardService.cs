@@ -115,7 +115,7 @@ public class CardService
         return await _db.Cards
             .Where(c => c.UserId == userId && c.NextReviewAt <= now)
             .OrderBy(c => c.NextReviewAt)
-            .ThenBy(c => c.EaseFactor)
+            .ThenByDescending(c => c.Difficulty)  // Harder cards first (higher difficulty)
             .Take(limit)
             .ToListAsync(ct);
     }

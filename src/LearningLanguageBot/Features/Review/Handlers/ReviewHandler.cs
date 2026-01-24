@@ -1,3 +1,4 @@
+using FSRS.Core.Enums;
 using LearningLanguageBot.Features.Cards.Services;
 using LearningLanguageBot.Features.Onboarding.Services;
 using LearningLanguageBot.Features.Review.Services;
@@ -144,6 +145,7 @@ public class ReviewHandler
         {
             // Typing mode: wait for user input
             state.ActiveReview.WaitingForTypedAnswer = true;
+            state.ActiveReview.AnswerStartTime = DateTime.UtcNow;
 
             var dontRememberKeyboard = new InlineKeyboardMarkup(new[]
             {
@@ -183,6 +185,7 @@ public class ReviewHandler
 
     /// <summary>
     /// Handles typed answer during Typing mode review.
+    /// Automatically determines FSRS rating based on match result and response time.
     /// </summary>
     public async Task HandleTypedAnswerAsync(Message message, UserState state, CancellationToken ct)
     {
@@ -201,13 +204,17 @@ public class ReviewHandler
 
         var userAnswer = message.Text ?? string.Empty;
         var matchResult = AnswerMatcher.Compare(userAnswer, card.Back);
+        var responseTime = DateTime.UtcNow - (session.AnswerStartTime ?? DateTime.UtcNow);
 
         session.WaitingForTypedAnswer = false;
+
+        // Auto-determine rating based on match result and response time
+        var rating = DetermineRating(matchResult, responseTime);
 
         switch (matchResult)
         {
             case MatchResult.Exact:
-                await HandleExactMatchAsync(message.Chat.Id, card, session, userId, state, ct);
+                await HandleExactMatchAsync(message.Chat.Id, card, session, userId, state, rating, ct);
                 break;
 
             case MatchResult.Partial:
@@ -220,16 +227,32 @@ public class ReviewHandler
         }
     }
 
-    private async Task HandleExactMatchAsync(long chatId, Card card, ReviewSession session, long userId, UserState state, CancellationToken ct)
+    /// <summary>
+    /// Determines FSRS rating based on match result and response time.
+    /// </summary>
+    private static Rating DetermineRating(MatchResult match, TimeSpan responseTime)
     {
-        await _reviewService.ProcessReviewAsync(session.CurrentCardId, knew: true, ct);
+        return match switch
+        {
+            MatchResult.Exact when responseTime < TimeSpan.FromSeconds(5) => Rating.Easy,
+            MatchResult.Exact => Rating.Good,
+            MatchResult.Partial => Rating.Hard,
+            MatchResult.Wrong => Rating.Again,
+            _ => Rating.Again
+        };
+    }
+
+    private async Task HandleExactMatchAsync(long chatId, Card card, ReviewSession session, long userId, UserState state, Rating rating, CancellationToken ct)
+    {
+        await _reviewService.ProcessReviewAsync(session.CurrentCardId, rating, ct);
         await _userService.IncrementTodayReviewedAsync(userId, ct);
-        await _reviewService.UpdateStatsAfterReviewAsync(userId, knew: true, ct);
+        await _reviewService.UpdateStatsAfterReviewAsync(userId, ct);
 
         session.KnewCount++;
         session.CurrentIndex++;
 
-        var text = $"✓ Верно!\n\n{card.Front} — {card.Back}";
+        var ratingEmoji = rating == Rating.Easy ? "🎯" : "✓";
+        var text = $"{ratingEmoji} Верно!\n\n{card.Front} — {card.Back}";
         if (card.Examples.Count > 0)
         {
             text += $"\n\n• {card.Examples[0].Original}";
@@ -242,12 +265,13 @@ public class ReviewHandler
 
     private async Task HandlePartialMatchAsync(long chatId, Card card, ReviewSession session, CancellationToken ct)
     {
+        // Show buttons for user to decide: count as Good or Again
         var keyboard = new InlineKeyboardMarkup(new[]
         {
             new[]
             {
-                InlineKeyboardButton.WithCallbackData("✓ Засчитать", $"{CallbackData.ReviewCountAsKnew}{card.Id}"),
-                InlineKeyboardButton.WithCallbackData("✗ Не засчитывать", $"{CallbackData.ReviewCountAsDidNotKnow}{card.Id}")
+                InlineKeyboardButton.WithCallbackData("✓ Засчитать (Good)", $"{CallbackData.ReviewCountAsGood}{card.Id}"),
+                InlineKeyboardButton.WithCallbackData("✗ Не засчитывать", $"{CallbackData.ReviewCountAsAgain}{card.Id}")
             }
         });
 
@@ -266,9 +290,9 @@ public class ReviewHandler
         // Show loading message
         var loadingMsg = await _bot.SendMessage(chatId, "🔄 Генерирую подсказку для запоминания...", cancellationToken: ct);
 
-        await _reviewService.ProcessReviewAsync(session.CurrentCardId, knew: false, ct);
+        await _reviewService.ProcessReviewAsync(session.CurrentCardId, Rating.Again, ct);
         await _userService.IncrementTodayReviewedAsync(userId, ct);
-        await _reviewService.UpdateStatsAfterReviewAsync(userId, knew: false, ct);
+        await _reviewService.UpdateStatsAfterReviewAsync(userId, ct);
 
         session.DidNotKnowCount++;
         session.CurrentIndex++;
@@ -306,21 +330,29 @@ public class ReviewHandler
             state.ActiveReview.ShowingAnswer = true;
             await ShowAnswerAsync(callback, state, ct);
         }
-        else if (data.StartsWith(CallbackData.ReviewKnew))
+        else if (data.StartsWith(CallbackData.ReviewAgain))
         {
-            await ProcessAnswerAsync(callback, state, knew: true, ct);
+            await ProcessAnswerAsync(callback, state, Rating.Again, ct);
         }
-        else if (data.StartsWith(CallbackData.ReviewDidNotKnow))
+        else if (data.StartsWith(CallbackData.ReviewHard))
         {
-            await ProcessAnswerAsync(callback, state, knew: false, ct);
+            await ProcessAnswerAsync(callback, state, Rating.Hard, ct);
         }
-        else if (data.StartsWith(CallbackData.ReviewCountAsKnew))
+        else if (data.StartsWith(CallbackData.ReviewGood))
         {
-            await ProcessTypingAnswerAsync(callback, state, knew: true, ct);
+            await ProcessAnswerAsync(callback, state, Rating.Good, ct);
         }
-        else if (data.StartsWith(CallbackData.ReviewCountAsDidNotKnow))
+        else if (data.StartsWith(CallbackData.ReviewEasy))
         {
-            await ProcessTypingAnswerAsync(callback, state, knew: false, ct);
+            await ProcessAnswerAsync(callback, state, Rating.Easy, ct);
+        }
+        else if (data.StartsWith(CallbackData.ReviewCountAsGood))
+        {
+            await ProcessTypingAnswerAsync(callback, state, Rating.Good, ct);
+        }
+        else if (data.StartsWith(CallbackData.ReviewCountAsAgain))
+        {
+            await ProcessTypingAnswerAsync(callback, state, Rating.Again, ct);
         }
         else if (data.StartsWith(CallbackData.ReviewDontRemember))
         {
@@ -330,16 +362,16 @@ public class ReviewHandler
         await _bot.AnswerCallbackQuery(callback.Id, cancellationToken: ct);
     }
 
-    private async Task ProcessTypingAnswerAsync(CallbackQuery callback, UserState state, bool knew, CancellationToken ct)
+    private async Task ProcessTypingAnswerAsync(CallbackQuery callback, UserState state, Rating rating, CancellationToken ct)
     {
         var userId = callback.From.Id;
         var session = state.ActiveReview!;
 
-        await _reviewService.ProcessReviewAsync(session.CurrentCardId, knew, ct);
+        await _reviewService.ProcessReviewAsync(session.CurrentCardId, rating, ct);
         await _userService.IncrementTodayReviewedAsync(userId, ct);
-        await _reviewService.UpdateStatsAfterReviewAsync(userId, knew, ct);
+        await _reviewService.UpdateStatsAfterReviewAsync(userId, ct);
 
-        if (knew)
+        if (rating >= Rating.Good)
             session.KnewCount++;
         else
             session.DidNotKnowCount++;
@@ -371,10 +403,10 @@ public class ReviewHandler
             replyMarkup: null,
             cancellationToken: ct);
 
-        // Treat as "didn't know"
-        await _reviewService.ProcessReviewAsync(cardId, knew: false, ct);
+        // Treat as "didn't know" (Again)
+        await _reviewService.ProcessReviewAsync(cardId, Rating.Again, ct);
         await _userService.IncrementTodayReviewedAsync(userId, ct);
-        await _reviewService.UpdateStatsAfterReviewAsync(userId, knew: false, ct);
+        await _reviewService.UpdateStatsAfterReviewAsync(userId, ct);
 
         session.DidNotKnowCount++;
         session.CurrentIndex++;
@@ -415,6 +447,7 @@ public class ReviewHandler
         {
             // Typing mode: ask for input
             session.WaitingForTypedAnswer = true;
+            session.AnswerStartTime = DateTime.UtcNow;
 
             var dontRememberKeyboard = new InlineKeyboardMarkup(new[]
             {
@@ -457,6 +490,9 @@ public class ReviewHandler
         }
     }
 
+    /// <summary>
+    /// Shows answer with 4 FSRS rating buttons including interval previews.
+    /// </summary>
     private async Task ShowAnswerAsync(CallbackQuery callback, UserState state, CancellationToken ct)
     {
         var session = state.ActiveReview!;
@@ -468,18 +504,34 @@ public class ReviewHandler
             return;
         }
 
+        // Get next intervals for all ratings
+        var intervals = await _reviewService.GetNextIntervalsAsync(session.CurrentCardId, ct);
+
         var text = $"{card.Front} — {card.Back}";
         if (card.Examples.Count > 0)
         {
             text += $"\n\n• {card.Examples[0].Original}";
         }
 
+        // Build 4-button keyboard with interval previews
+        // Format: 🔄 Снова (1м) | 😓 Трудно (6м)
+        //         👍 Хорошо (1д) | 🎯 Легко (4д)
+        var againInterval = FsrsService.FormatInterval(intervals.GetValueOrDefault(Rating.Again, TimeSpan.FromMinutes(1)));
+        var hardInterval = FsrsService.FormatInterval(intervals.GetValueOrDefault(Rating.Hard, TimeSpan.FromMinutes(6)));
+        var goodInterval = FsrsService.FormatInterval(intervals.GetValueOrDefault(Rating.Good, TimeSpan.FromDays(1)));
+        var easyInterval = FsrsService.FormatInterval(intervals.GetValueOrDefault(Rating.Easy, TimeSpan.FromDays(4)));
+
         var keyboard = new InlineKeyboardMarkup(new[]
         {
             new[]
             {
-                InlineKeyboardButton.WithCallbackData("✗ Не знал", $"{CallbackData.ReviewDidNotKnow}{card.Id}"),
-                InlineKeyboardButton.WithCallbackData("✓ Знал", $"{CallbackData.ReviewKnew}{card.Id}")
+                InlineKeyboardButton.WithCallbackData($"🔄 Снова ({againInterval})", $"{CallbackData.ReviewAgain}{card.Id}"),
+                InlineKeyboardButton.WithCallbackData($"😓 Трудно ({hardInterval})", $"{CallbackData.ReviewHard}{card.Id}")
+            },
+            new[]
+            {
+                InlineKeyboardButton.WithCallbackData($"👍 Хорошо ({goodInterval})", $"{CallbackData.ReviewGood}{card.Id}"),
+                InlineKeyboardButton.WithCallbackData($"🎯 Легко ({easyInterval})", $"{CallbackData.ReviewEasy}{card.Id}")
             }
         });
 
@@ -491,16 +543,17 @@ public class ReviewHandler
             cancellationToken: ct);
     }
 
-    private async Task ProcessAnswerAsync(CallbackQuery callback, UserState state, bool knew, CancellationToken ct)
+    private async Task ProcessAnswerAsync(CallbackQuery callback, UserState state, Rating rating, CancellationToken ct)
     {
         var userId = callback.From.Id;
         var session = state.ActiveReview!;
 
-        await _reviewService.ProcessReviewAsync(session.CurrentCardId, knew, ct);
+        await _reviewService.ProcessReviewAsync(session.CurrentCardId, rating, ct);
         await _userService.IncrementTodayReviewedAsync(userId, ct);
-        await _reviewService.UpdateStatsAfterReviewAsync(userId, knew, ct);
+        await _reviewService.UpdateStatsAfterReviewAsync(userId, ct);
 
-        if (knew)
+        // Count as "knew" if rating >= Good
+        if (rating >= Rating.Good)
             session.KnewCount++;
         else
             session.DidNotKnowCount++;

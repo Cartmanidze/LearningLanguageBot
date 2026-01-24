@@ -1,3 +1,4 @@
+using FSRS.Core.Extensions;
 using Hangfire;
 using Hangfire.PostgreSql;
 using LearningLanguageBot.Features.Cards.Handlers;
@@ -70,7 +71,23 @@ try
     builder.Services.AddScoped<CardCreationHandler>();
     builder.Services.AddScoped<CardBrowserHandler>();
 
-    // Features: Review
+    // Features: Review (with FSRS algorithm)
+    builder.Services.AddFSRS(options =>
+    {
+        options.DesiredRetention = 0.9;       // 90% target retention
+        options.MaximumInterval = 365;        // Max 1 year interval
+        options.EnableFuzzing = true;         // Randomize intervals slightly
+        options.LearningSteps =               // Steps for new cards
+        [
+            TimeSpan.FromMinutes(1),
+            TimeSpan.FromMinutes(10)
+        ];
+        options.RelearningSteps =             // Steps for forgotten cards
+        [
+            TimeSpan.FromMinutes(10)
+        ];
+    });
+    builder.Services.AddScoped<FsrsService>();
     builder.Services.AddScoped<ReviewService>();
     builder.Services.AddScoped<MemoryHintService>();
     builder.Services.AddScoped<ReviewHandler>();
