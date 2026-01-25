@@ -14,6 +14,7 @@ public class Card
     public double Stability { get; set; }
     public double Difficulty { get; set; } = 0.3;
     public int State { get; set; }          // New=0, Learning=1, Review=2, Relearning=3
+    public int? Step { get; set; }          // Current step in Learning/Relearning (null for Review state)
     public int Lapses { get; set; }
     public int Reps { get; set; }
     public DateTime? LastReview { get; set; }

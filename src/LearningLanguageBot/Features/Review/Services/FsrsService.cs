@@ -84,10 +84,20 @@ public class FsrsService
         // For reviewed cards, use stored values
         var isNew = card.State == 0;
 
+        // Step is required for Learning/Relearning states
+        // Use stored step, or 0 for new cards, or null for Review state
+        int? step = fsrsState switch
+        {
+            State.Learning => card.Step ?? 0,
+            State.Relearning => card.Step ?? 0,
+            State.Review => null,
+            _ => null
+        };
+
         return new Card(
             cardId: null,
             state: fsrsState,
-            step: isNew ? 0 : null,
+            step: step,
             stability: isNew ? null : (card.Stability > 0 ? card.Stability : 1.0),
             difficulty: isNew ? null : (card.Difficulty > 0 ? card.Difficulty : 0.3),
             due: card.NextReviewAt,
@@ -102,6 +112,9 @@ public class FsrsService
         card.Difficulty = fsrsCard.Difficulty ?? 0.3;
         card.LastReview = fsrsCard.LastReview;
         card.Reps++;
+
+        // Save step for Learning/Relearning states (required by FSRS)
+        card.Step = fsrsCard.Step;
 
         // Map FSRS state back to app state
         // FSRS.Core: Learning=0, Review=1, Relearning=2

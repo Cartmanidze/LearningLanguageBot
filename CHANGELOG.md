@@ -22,6 +22,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Fixed FSRS crash on new cards with null LastReview
   - "Nullable object must have a value" error when reviewing new cards
   - Now defaults to current time for cards without LastReview
+- Fixed FSRS crash on Relearning cards with missing Step
+  - "Nullable object must have a value" in `HandleGoodRating` when reviewing cards in Relearning state
+  - Added `Step` field to Card model to properly track Learning/Relearning progress
+  - Migration: `AddCardStep` adds nullable `Step` column to Cards table
 
 ### Improved
 - Optimized memory hint generation speed
